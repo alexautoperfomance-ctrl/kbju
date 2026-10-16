@@ -23,7 +23,7 @@ async def main():
     await c.add_init_script(FAKE); pg=await c.new_page()
     pg.on('console',lambda m: m.type=='error' and errs.append(m.text)); pg.on('pageerror',lambda e: errs.append(str(e)))
     await pg.goto(URL); await pg.wait_for_selector('#nav button')
-    assert 'v1.6.0' in await pg.inner_text('#ver')
+    assert 'v1.7.0' in await pg.inner_text('#ver')
     assert await pg.locator('text=🔊').count()==0, 'нет кнопок озвучки'
     # --- микрофон-переключатель: 3 сессии (iOS-рестарты) до нажатия «стоп»
     await pg.evaluate("window.__chunks=['на завтрак два яйца','и кофе с молоком','на обед 200 грамм гречки и куриная грудка']")
@@ -124,6 +124,19 @@ async def main():
     nt=await pg.inner_text('#vres'); print('confirm:',nt.replace(chr(10),' | ')[:240]); assert '3 шт ≈ 54 г мякоти' in nt and await pg.locator('.cands').count()>=1
     await pg.screenshot(path='shots/confirm-fuzzy.png'); await pg.click('[data-cand="1:0"]'); assert await pg.locator('.cands').count()==0
     await pg.click('[data-vsave]'); await pg.wait_for_timeout(500); await pg.click('[data-edit]:has-text("маракуйя") >> nth=-1'); await pg.wait_for_selector('#dnote'); assert '54 г мякоти' in await pg.inner_text('#dnote'); await pg.screenshot(path='shots/detail-edible.png')
+    await pg.click('#sheet.on [data-close]'); await pg.wait_for_timeout(300)
+    await pg.click('[data-tab="menu"]'); await pg.wait_for_selector('.mwk'); assert await pg.locator('.mwk button').count()==7
+    await pg.click('[data-mday="2"]'); await pg.wait_for_timeout(100); mt=await pg.inner_text('.mtot'); print('menu tot',mt.replace(chr(10),' '))
+    nums=[int(x) for x in re.findall(r'\d+',mt)]; assert abs(nums[0]-nums[1])/nums[1]<=0.03, 'ккал ±3%'
+    assert await pg.locator('.meal').count()==5 and await pg.locator('.dmr').count()==29
+    await pg.evaluate("window.scrollTo(0,0)"); await pg.screenshot(path='shots/menu-day.png')
+    first=await pg.inner_text('.mi >> nth=0 >> .n'); await pg.click('[data-mswap="0:0"]'); await pg.wait_for_timeout(300); assert await pg.inner_text('.mi >> nth=0 >> .n')!=first, 'замена'
+    before=await pg.inner_text('.meal'); await pg.click('[data-mregen]'); await pg.wait_for_timeout(300); print('regen changed',before!=await pg.inner_text('.meal'))
+    st=await pg.evaluate("JSON.parse(localStorage.getItem('kbju.v1')).menu.week.length"); assert st==7
+    await pg.click('[data-madd="0"]'); await pg.wait_for_timeout(200); await pg.click('[data-tab="diary"]'); await pg.click('[data-tab="menu"]'); assert 'Ср' in await pg.inner_text('.mwk .on')
+    await pg.click('details[data-k="m_set"] summary h2'); await pg.check('[data-mex="рыба"]'); await pg.wait_for_timeout(500)
+    ex=await pg.evaluate("JSON.parse(localStorage.getItem('kbju.v1')).menu"); assert 'рыба' in ex['opt']['excl'] and not any(x['n'] in ('горбуша','треска','минтай','скумбрия','сельдь','хек') for d in ex['week'] for m in d['meals'] for x in m['items'])
+    print('menu ok')
     print('sw',await pg.evaluate("navigator.serviceWorker.getRegistration().then(r=>!!r)"))
     await b.close()
   net=[e for e in errs if 'openfoodfacts' in e or 'ERR_FAILED' in e]; app=[e for e in errs if e not in net]

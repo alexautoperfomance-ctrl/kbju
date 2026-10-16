@@ -71,6 +71,9 @@ details.col>summary{list-style:none;cursor:pointer;min-height:36px}details.col>s
 .dmr.low .b i{background:var(--F)}.dmr.over .b i{background:var(--red)}.dmr.over .a{color:var(--red)}
 .cands{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:4px}.cands .chip{min-height:30px;font-size:12px}.cands .chip.on{outline:1px solid var(--a,#4c8)}.inote{margin-top:2px}
 .tips{margin-top:6px;border-top:1px solid #0001;padding-top:6px}.tph{font-weight:600;font-size:13px;margin-bottom:2px}.tpb{font-size:12px;margin:2px 0}.tp{font-size:12px;line-height:1.35;padding:3px 0}.tpf{white-space:nowrap;background:none;border:0;padding:2px 0;font:inherit;color:var(--a,#0a7);text-decoration:underline dotted;cursor:pointer;min-height:24px}.tpf i{font-style:normal;color:#888}
+.mwk{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;padding:6px}.mwk button{min-height:36px;border:0;border-radius:10px;background:#eef1ef;font:inherit;font-size:.8rem;font-weight:600}.mwk button.on{background:var(--g);color:#fff}
+.mtot{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;text-align:center}.mtot b{display:block;font-size:1.05rem}.mtot span{font-size:.62rem;color:var(--mu)}.mtot .bad b{color:var(--red)}
+.mi{grid-template-columns:1fr auto 40px 32px!important}.mi .sw{border:0;background:#eef1ef;border-radius:8px;min-height:28px;min-width:28px;font-size:.85rem}.mnote{font-size:.68rem;color:var(--mu);margin-top:6px;line-height:1.4}.mex{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:.8rem;margin-top:4px}
 </style></head><body>
 <header><button id="prev" aria-label="Предыдущий день">‹</button><div class="d" id="dlabel"></div><button id="next" aria-label="Следующий день">›</button><span id="ver"></span></header>
 <main id="app"></main>
@@ -79,5 +82,5 @@ details.col>summary{list-style:none;cursor:pointer;min-height:36px}details.col>s
 <div class="sheet" id="sheet"><div id="sbody"></div></div>
 <div class="sheet" id="sheet2"><div id="sbody2"></div></div>
 <div id="toast"></div>
-<script src="db.js"></script><script src="micro.js"></script><script src="micros.js"></script><script src="parser.js"></script><script src="nutri.js"></script><script src="app.js"></script>
+<script src="db.js"></script><script src="micro.js"></script><script src="micros.js"></script><script src="menu.js"></script><script src="parser.js"></script><script src="nutri.js"></script><script src="app.js"></script>
 </body></html>

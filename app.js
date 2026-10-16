@@ -1,5 +1,5 @@
 'use strict';
-const VER='1.6.0';
+const VER='1.7.0';
 const $=s=>document.querySelector(s), R=Math.round, esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const MEALS=['завтрак','обед','ужин','перекус'], MI={завтрак:'🍳',обед:'🍲',ужин:'🍽️',перекус:'🍎'};
 const KEY='kbju.v1';
@@ -84,10 +84,10 @@ function tipsHtml(L,g){ const a=lastAdv.micro; if(!a||!L.length)return ''; const
   return `<div class="tips"><div class="tph">🧪 Добрать витамины и минералы <span class="mu">· тап — добавить</span></div>${best&&best[1]>=3?`<div class="tpb">⭐ ${esc(best[0])} закрывает сразу ${best[1]} ${best[1]%10>=2&&best[1]%10<=4&&(best[1]%100<12||best[1]%100>14)?'дефицита':'дефицитов'}</div>`:''}`+
    tl.map(x=>`<div class="tp" data-tk="${x.k}"><b>${SHORT[x.k]||esc(x.n)} ${R(x.pct)}%</b> — ${x.foods.map(f=>`<button class="tpf" data-tipadd="${esc(f.n)}|${R(f.g)}">${best&&best[1]>=3&&f.n===best[0]?'⭐':''}${esc(f.n)} ${MICROS.portTxt(f.f,f.g)} <i>+${R(f.cv)}%</i></button>`).join(', ')}</div>`).join('')+`</div>` }
 let lastAdv={};
-function render(){ $('#dlabel').textContent=tab==='diary'||(tab==='stats'&&statMode==='day')?fmtD(cur):({stats:'Статистика',recipes:'Рецепты',goals:'Цели',more:'Ещё'})[tab];
+function render(){ $('#dlabel').textContent=tab==='diary'||(tab==='stats'&&statMode==='day')?fmtD(cur):({menu:'Меню на неделю',stats:'Статистика',recipes:'Рецепты',goals:'Цели',more:'Ещё'})[tab];
   $('#prev').style.visibility=$('#next').style.visibility=(tab==='diary'||tab==='stats')?'visible':'hidden';
-  $('#nav').innerHTML=[['diary','📒','Дневник'],['stats','📊','Статистика'],['recipes','🍲','Рецепты'],['goals','🎯','Цели'],['more','⚙️','Ещё']].map(([k,i,n])=>`<button data-tab="${k}" class="${tab===k?'on':''}"><b>${i}</b>${n}</button>`).join('');
-  $('#app').innerHTML=({diary:vDiary,stats:vStats,recipes:vRecipes,goals:vGoals,more:vMore})[tab](); if(tab==='diary')animMicro(); if(!render.keep)window.scrollTo(0,0); render.keep=false }
+  $('#nav').innerHTML=[['diary','📒','Дневник'],['menu','🍽','Меню'],['stats','📊','Статистика'],['recipes','🍲','Рецепты'],['goals','🎯','Цели'],['more','⚙️','Ещё']].map(([k,i,n])=>`<button data-tab="${k}" class="${tab===k?'on':''}"><b>${i}</b>${n}</button>`).join('');
+  $('#app').innerHTML=({diary:vDiary,menu:vMenu,stats:vStats,recipes:vRecipes,goals:vGoals,more:vMore})[tab](); if(tab==='diary')animMicro(); if(!render.keep)window.scrollTo(0,0); render.keep=false }
 function vDiary(){ const L=day(cur), t=tot(L), g=S.goals, w=S.water[cur]||0; const adv=advice(L,g,{water:w}); lastAdv.day=adv;
   let h=`<div class="card">${summary(t,g)}</div>`+diaryMicro(L);
   h+=`<div class="card">`+MEALS.map(m=>{ const es=L.filter(e=>e.meal===m), mt=tot(es);
@@ -139,6 +139,48 @@ function vNutri(keys){ const ma=MICROS.analyze(keys.map(day),S.prof,MK,microLook
 function recipeNut(r){ const s=r.ings.reduce((a,i)=>(a.k+=i.k*i.g/100,a.p+=i.p*i.g/100,a.f+=i.f*i.g/100,a.c+=i.c*i.g/100,a.g+=i.g,a),{k:0,p:0,f:0,c:0,g:0}); const y=r.yield||s.g||1;
   const m=new Array(MK.length).fill(0); r.ings.forEach(i=>{ const v=i.m||(self.MICRO&&self.MICRO[i.n]); if(v)v.forEach((x,j)=>m[j]+=(+x||0)*i.g/y) });
   return {k:s.k/y*100,p:s.p/y*100,f:s.f/y*100,c:s.c/y*100,raw:s.g,m} }
+// ---------- 🍽 Меню: сбалансированная неделя ----------
+const WD=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'], MEXCL=['рыба','мясо','свинина','молочное','яйца','глютен','орехи'];
+function mctx(){ return {foods:self.FOODS,MICRO:self.MICRO,MK,norms:MICROS.norms(S.prof),goals:{k:S.goals.k,p:S.goals.p,f:S.goals.f,c:S.goals.c}} }
+let MCTX=null; const mc=()=>MCTX&&MCTX.gk===mgk()?MCTX:(MCTX=Object.assign(mctx(),{gk:mgk()}));
+function mgk(){ return [S.goals.k,S.goals.p,S.goals.f,S.goals.c,(S.prof||{}).sex,(S.prof||{}).a].join('|') }
+function mopt(){ return S.menu&&S.menu.opt||{meals:5,excl:[],simple:false} }
+function mGen(opt){ const t0=Date.now(), w=MENU.genWeek(mc(),Object.assign({},opt,{seed:opt.seed})); S.menu={opt,gk:mgk(),sel:S.menu&&S.menu.sel||0,week:w.map(d=>({seed:d.seed,meals:d.meals.map(m=>({k:m.k,m:m.m,items:m.items.map(x=>({n:x.n,g:x.g,lo:x.lo,hi:x.hi,typ:x.typ,grp:x.grp,slot:x.slot}))}))}))}; save(); return Date.now()-t0 }
+function mDay(i){ const d=S.menu.week[i]; return MENU.evalDay({meals:JSON.parse(JSON.stringify(d.meals))},mc()) }
+function mStore(i,d){ S.menu.week[i]={seed:d.seed||S.menu.week[i].seed,meals:d.meals.map(m=>({k:m.k,m:m.m,items:m.items.map(x=>({n:x.n,g:x.g,lo:x.lo,hi:x.hi,typ:x.typ,grp:x.grp,slot:x.slot}))}))}; save() }
+function vMenu(){ if(!S.menu||!S.menu.week)mGen(mopt()); const M=S.menu, i=M.sel||0, d=mDay(i), g=S.goals, o=M.opt;
+  const dlt=(a,b,tol)=>{ const e=Math.abs(a-b)/b; return e<=tol?'ok':'bad' };
+  let h=`<div class="card mwk">${WD.map((n,j)=>`<button class="${j===i?'on':''}" data-mday="${j}">${n}</button>`).join('')}</div>`;
+  if(M.gk!==mgk()) h+=`<div class="card hint">Цели или профиль изменились — <button class="btn sm" data-mweek="1">пересоставить неделю</button></div>`;
+  h+=`<div class="card"><div class="mtot"><div class="${dlt(d.tot.k,g.k,.03)}"><b>${R(d.tot.k)}</b><span>/ ${R(g.k)} ккал</span></div><div class="cP ${dlt(d.tot.p,g.p,.05)}"><b>${R(d.tot.p)}</b><span>/ ${R(g.p)} Б</span></div><div class="cF ${dlt(d.tot.f,g.f,.05)}"><b>${R(d.tot.f)}</b><span>/ ${R(g.f)} Ж</span></div><div class="cC ${dlt(d.tot.c,g.c,.05)}"><b>${R(d.tot.c)}</b><span>/ ${R(g.c)} У</span></div></div>
+   <div class="row" style="margin-top:6px"><button class="btn s sm sp" data-mregen="1">🔄 Другой вариант</button><button class="btn sm sp" data-maddday="1">＋ Весь день в дневник</button></div></div>`;
+  h+=`<div class="card">`+d.meals.map((m,mi)=>`<div class="meal"><div class="mh">${MI[m.m]||'🍎'} ${m.m[0].toUpperCase()+m.m.slice(1)} <span class="mu">${R(m.tot.k)} ккал · ${R(m.tot.p)}·${R(m.tot.f)}·${R(m.tot.c)}</span><button class="add" data-madd="${mi}" aria-label="В дневник">＋</button></div>`+
+    m.items.map((x,ii)=>{ const f=fdb(x.n)||{k:0}; return `<div class="it il mi"><span class="n">${esc(x.n)}</span><span class="mu">${R(x.g)}г</span><span class="k">${R(f.k*x.g/100)}</span><button class="sw" data-mswap="${mi}:${ii}" aria-label="Заменить">⇄</button></div>` }).join('')+`</div>`).join('')+`</div>`;
+  const nt=MENU.notes(d), ml=d.micro.filter(m=>m.k!=='Na');
+  h+=`<details class="card col" data-k="m_micro" ${S.set.m_micro!==false?'open':''}><summary class="row"><h2 class="sp">🧪 Витамины и минералы <span class="mu">${ml.filter(m=>m.t!=='lim'&&m.amt>=m.norm*.995).length}/${ml.filter(m=>m.t!=='lim').length} в норме</span></h2><span class="chev">›</span></summary>
+   <div class="dmg">${ml.map(m=>{ const lim=m.t==='lim', st=lim?(m.amt>(m.ul||m.norm)?'over':''):m.ul&&m.amt>m.ul?'over':m.pct<99.5?'low':'', w=Math.min(100,m.pct);
+     return `<div class="dmr ${st}"><span class="n">${SHORT[m.k]||esc(m.n)}</span><span class="b"><i style="width:${w}%"></i><em>${R(m.pct)}%</em></span><span class="a">${R(m.amt)}/${R(lim?(m.ul||m.norm):m.norm)} ${m.u}</span></div>` }).join('')}</div>
+   ${nt.length?`<div class="mnote">${nt.map(n=>`⚠️ ${esc(n.t)} (${R(n.pct)}%)`).join('<br>')}</div>`:''}</details>`;
+  h+=`<details class="card col" data-k="m_set" ${S.set.m_set?'open':''}><summary class="row"><h2 class="sp">⚙️ Настройки меню</h2><span class="chev">›</span></summary>
+   <div class="mu">Исключить:</div><div class="mex">${MEXCL.map(e=>`<label><input type="checkbox" data-mex="${e}" ${o.excl.includes(e)?'checked':''}> ${e}</label>`).join('')}</div>
+   <div class="row" style="margin-top:6px"><label class="sp"><input type="checkbox" id="msimple" ${o.simple?'checked':''}> 💰 простое/бюджетное</label><select id="mmeals">${[3,4,5].map(n=>`<option value="${n}" ${o.meals===n?'selected':''}>${n} приёма</option>`).join('')}</select></div>
+   <div class="row" style="margin-top:6px"><button class="btn sp" data-mweek="1">🔄 Пересоставить неделю</button></div>
+   <div class="mu" style="margin-top:4px">Меню считается под цели (${R(g.k)} ккал, Б/Ж/У) и нормы микроэлементов по полу и возрасту.</div></details>`;
+  return h }
+function mAdd(items,meal){ const L=S.days[dk()]=day(dk()).slice(); let k=0;
+  items.forEach(([x,m])=>{ const f=fdb(x.n); if(!f)return; const n=KP.nutr(f,x.g); L.push({id:uid(),meal:m,name:f.n,g:R(x.g),k:n.k,p:n.p,f:n.f,c:n.c,k100:f.k,p100:f.p,f100:f.f,c100:f.c,cat:f.cat||'',src:f.src||'',m100:f.m||undefined}); S.used[f.n]=(S.used[f.n]||0)+1; k+=n.k });
+  save(); dirty(); toast(`В дневник (сегодня): ${items.length} · ${R(k)} ккал`) }
+function menuClick(d,t){
+  if(d.mday!=null){ S.menu.sel=+d.mday; save(); render(); return true }
+  if(d.mregen){ const i=S.menu.sel||0, w=S.menu.week.map((_,j)=>mDay(j)); const nd=MENU.regenDay(mc(),S.menu.opt,w,i,(Date.now()>>>0)); mStore(i,nd); render.keep=true; render(); toast('Новый вариант дня'); return true }
+  if(d.mswap){ const [mi,ii]=d.mswap.split(':').map(Number), i=S.menu.sel||0, dd=mDay(i), old=dd.meals[mi].items[ii].n; MENU.swapItem(mc(),S.menu.opt,dd,mi,ii,Date.now()>>>0); mStore(i,dd); render.keep=true; render(); toast(`${old} → ${dd.meals[mi].items[ii].n}, день пересчитан`); return true }
+  if(d.maddday){ const dd=mDay(S.menu.sel||0); mAdd([].concat(...dd.meals.map(m=>m.items.map(x=>[x,m.m])))); return true }
+  if(d.madd!=null){ const dd=mDay(S.menu.sel||0), m=dd.meals[+d.madd]; mAdd(m.items.map(x=>[x,m.m])); return true }
+  if(d.mweek){ const o=mopt(); o.seed=Date.now()>>>0; mGen(o); render(); toast('Неделя пересоставлена'); return true }
+  return false }
+function menuChange(t){ if(!S.menu)return false; const o=Object.assign({},mopt());
+  if(t.dataset.mex){ o.excl=MEXCL.filter(e=>document.querySelector(`[data-mex="${e}"]`).checked) } else if(t.id==='msimple'){ o.simple=t.checked } else if(t.id==='mmeals'){ o.meals=+t.value } else return false;
+  S.set.m_set=true; mGen(o); render.keep=true; render(); toast('Меню пересоставлено'); return true }
 function vRecipes(){ let h=`<div class="card"><div class="row"><h2 class="sp">Мои рецепты</h2><button class="btn sm" data-newrec="1">＋ Рецепт</button></div><div class="mu">Добавляй голосом по названию: «мой плов 300 грамм» или «порция борща мамы».</div></div>`;
   if(!S.recipes.length) h+=`<div class="card empty">Рецептов пока нет.<br>Создай рецепт вручную или надиктуй ингредиенты.<br><br><button class="btn" data-newrec="voice">🎙️ Надиктовать рецепт</button></div>`;
   S.recipes.forEach(r=>{const n=recipeNut(r),sv=r.yield/Math.max(1,r.servings);h+=`<div class="card"><div class="row"><h2 class="sp">${esc(r.name)}</h2><button class="btn s sm" data-recinfo="${r.id}" aria-label="Состав порции">ⓘ</button><button class="btn s sm" data-editrec="${r.id}">✎</button><button class="btn sm" data-userec="${r.id}">В дневник</button></div>
@@ -277,6 +319,7 @@ function addEntry(f,g,meal){ const n=KP.nutr(f,g); (S.days[cur]=day(cur).slice()
 document.addEventListener('click',e=>{ const mr=e.target.closest('[data-mic]'); if(mr){openMicro(mr.dataset.mic);return}
   const t=e.target.closest('button,[data-edit],[data-pf],.sheet'); if(!t)return; const d=t.dataset;
   if(t.classList.contains('sheet')){ if(e.target===t)closeSheet(t.id==='sheet2'?2:1); return }
+  if(tab==='menu'&&menuClick(d,t))return;
   if(d.tab){tab=d.tab;render();return} if(d.sm){statMode=d.sm;render();return}
   if(t.id==='prev'||t.id==='next'){cur=addD(cur,t.id==='prev'?-1:1);render();return}
   if(t.id==='fab'){openVoice();return} if(d.addm){openVoice(d.addm);return}
@@ -322,7 +365,7 @@ document.addEventListener('input',e=>{ const t=e.target,d=t.dataset;
   if(t.id==='swater'){S.set.water=t.checked;save();return}
 });
 document.addEventListener('toggle',e=>{ const t=e.target; if(!t.classList)return; if(t.classList.contains('nutri')){S.set.nutriOpen=t.open;save()} else if(t.dataset&&t.dataset.k){S.set[t.dataset.k]=t.open;save()} },true);
-document.addEventListener('change',e=>{ const t=e.target,d=t.dataset; if(d.imeal!=null){V.items[+d.imeal].meal=t.value;return}
+document.addEventListener('change',e=>{ const t=e.target,d=t.dataset; if(tab==='menu'&&menuChange(t))return; if(d.imeal!=null){V.items[+d.imeal].meal=t.value;return}
   if(t.id==='imp'&&t.files[0]){ t.files[0].text().then(x=>{ const j=JSON.parse(x); if(!j.days)throw 0; if(!confirm('Заменить текущие данные импортом?'))return; S=Object.assign(def(),j); save(); dirty(); render(); toast('Импортировано') }).catch(()=>toast('Неверный файл')) } });
 document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&e.target.id==='pq'){e.preventDefault();showRes()} });
 $('#ver').textContent='v'+VER; render();
