@@ -14,7 +14,7 @@ async def main():
     await c.add_init_script(FAKE); pg=await c.new_page()
     pg.on('console',lambda m: m.type=='error' and errs.append(m.text)); pg.on('pageerror',lambda e: errs.append(str(e)))
     await pg.goto(URL); await pg.wait_for_selector('#nav button')
-    assert 'v1.1.0' in await pg.inner_text('#ver')
+    assert 'v1.2.0' in await pg.inner_text('#ver')
     # голос: завтрак+обед
     await pg.evaluate("window.__nextTranscript='на завтрак два яйца и кофе с молоком, на обед 200 грамм гречки и куриная грудка'")
     await pg.click('#fab'); await pg.wait_for_selector('.pi'); await pg.wait_for_timeout(300)
@@ -47,6 +47,8 @@ async def main():
     await pg.click('[data-tab="goals"]'); await pg.fill('#cw','92'); await pg.dispatch_event('#cw','input'); await pg.click('[data-applycalc]')
     g=await pg.evaluate('window.__kbju.S.goals'); print('goals',g)
     await pg.screenshot(path='shots/goals.png',full_page=False)
+    await pg.evaluate('window.scrollTo(0,0)'); await pg.click('[data-tab="diary"]'); await pg.wait_for_timeout(100); await pg.screenshot(path='shots/diary-compact.png')
+    vis=await pg.evaluate("(()=>{const m=[...document.querySelectorAll('.meal')];const last=m[m.length-1].getBoundingClientRect();return [last.bottom, innerHeight, document.querySelector('#fab').getBoundingClientRect().top]})()"); print('diary last-meal bottom / viewport',vis)
     # история для статистики (только в тесте)
     await pg.evaluate('''()=>{const S=window.__kbju.S;const F=self.FOODS;const pick=n=>F.find(f=>f.n===n);const L=['гречка','куриная грудка отварная','творог 5%','банан','борщ','пельмени','салат оливье','кофе с молоком','хлеб черный','шоколад молочный','яйцо','плов'];
       for(let i=1;i<30;i++){const d=new Date();d.setDate(d.getDate()-i);const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');if(i%9===0)continue;
@@ -54,8 +56,8 @@ async def main():
       localStorage.setItem('kbju.v1',JSON.stringify(S))}''')
     await pg.reload(); await pg.wait_for_selector('#nav button')
     await pg.click('[data-tab="stats"]'); await pg.screenshot(path='shots/stats-day.png',full_page=False)
-    await pg.click('[data-sm="week"]'); await pg.wait_for_timeout(100); await pg.screenshot(path='shots/stats.png',full_page=False); await pg.evaluate('window.scrollTo(0,600)'); await pg.screenshot(path='shots/stats-week-bottom.png')
-    await pg.evaluate("document.querySelector('details.nutri').scrollIntoView();window.scrollBy(0,-62)"); await pg.wait_for_timeout(100); await pg.screenshot(path='shots/nutritionist.png')
+    await pg.click('[data-sm="week"]'); await pg.wait_for_timeout(100); await pg.screenshot(path='shots/stats.png',full_page=False); await pg.screenshot(path='shots/stats-compact.png'); await pg.evaluate('window.scrollTo(0,600)'); await pg.screenshot(path='shots/stats-week-bottom.png')
+    await pg.click('details.nutri summary h2'); await pg.evaluate("document.querySelector('details.nutri').scrollIntoView();window.scrollBy(0,-62)"); await pg.wait_for_timeout(100); await pg.screenshot(path='shots/nutritionist.png')
     nt=await pg.inner_text('details.nutri'); print('nutri week:',nt[:400].replace('\n',' | ')); assert '/10' in nt and 'не медицинская' in nt
     await pg.click('[data-say="nutri"]'); print('nutri tts:',(await pg.evaluate('window.__tts'))[-1][:160])
     await pg.click('[data-sm="month"]'); await pg.wait_for_timeout(100); await pg.screenshot(path='shots/stats-month.png',full_page=False)

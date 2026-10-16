@@ -1,5 +1,5 @@
 'use strict';
-const VER='1.1.0';
+const VER='1.2.0';
 const $=s=>document.querySelector(s), R=Math.round, esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const MEALS=['завтрак','обед','ужин','перекус'], MI={завтрак:'🍳',обед:'🍲',ужин:'🍽️',перекус:'🍎'};
 const KEY='kbju.v1';
@@ -63,9 +63,9 @@ function ring(v,g,size,color,label,sub){ const r=size/2-7,C=2*Math.PI*r,p=Math.m
   return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="#eef1ef" stroke-width="11"/><circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${over?'var(--red)':color}" stroke-width="11" stroke-linecap="round" stroke-dasharray="${C*p} ${C}" transform="rotate(-90 ${size/2} ${size/2})"/><text x="50%" y="46%" text-anchor="middle" font-size="${size/5.2}" font-weight="700" fill="currentColor">${label}</text><text x="50%" y="64%" text-anchor="middle" font-size="${size/11}" fill="#738078">${sub}</text></svg>` }
 function bar(name,v,g,col){ return `<div class="bar"><div class="t"><span>${name}</span><span><b>${R(v)}</b> / ${R(g)} г</span></div><div class="tr"><i style="width:${Math.min(100,g?v/g*100:0)}%;background:${v>g*1.1?'var(--red)':col}"></i></div></div>` }
 function summary(t,g,mul){ mul=mul||1; const left=R(g.k*mul-t.k);
-  return `<div class="sum">${ring(t.k,g.k*mul,118,'var(--K)',R(t.k),left>=0?'осталось '+left:'перебор '+(-left))}<div class="bars">${bar('Белки',t.p,g.p*mul,'var(--P)')}${bar('Жиры',t.f,g.f*mul,'var(--F)')}${bar('Углеводы',t.c,g.c*mul,'var(--C)')}<div class="mu">цель ${R(g.k*mul)} ккал</div></div></div>` }
+  return `<div class="sum">${ring(t.k,g.k*mul,92,'var(--K)',R(t.k),left>=0?'осталось '+left:'перебор '+(-left))}<div class="bars">${bar('Белки',t.p,g.p*mul,'var(--P)')}${bar('Жиры',t.f,g.f*mul,'var(--F)')}${bar('Углеводы',t.c,g.c*mul,'var(--C)')}<div class="mu">цель ${R(g.k*mul)} ккал</div></div></div>` }
 const chips=e=>`<span class="chip cP">Б ${R(e.p)}</span><span class="chip cF">Ж ${R(e.f)}</span><span class="chip cC">У ${R(e.c)}</span>`;
-function advHtml(list,sayId){ return `<div class="card"><div class="row"><h2 class="sp">Советы</h2><button class="btn s sm" data-say="${sayId}">🔊</button></div>${list.map(([i,t])=>`<div class="adv"><span>${i}</span><span>${esc(t)}</span></div>`).join('')}</div>` }
+function advHtml(list,sayId){ const k='adv_'+sayId; return `<details class="card col" data-k="${k}" ${S.set[k]?'open':''}><summary class="row"><h2 class="sp">💡 Советы <span class="mu">${list.length}</span></h2><button class="btn s sm" data-say="${sayId}" onclick="event.preventDefault()">🔊</button><span class="chev">›</span></summary>${list.map(([i,t])=>`<div class="adv"><span>${i}</span><span>${esc(t)}</span></div>`).join('')}</details>` }
 let lastAdv={};
 function render(){ $('#dlabel').textContent=tab==='diary'||(tab==='stats'&&statMode==='day')?fmtD(cur):({stats:'Статистика',recipes:'Рецепты',goals:'Цели',more:'Ещё'})[tab];
   $('#prev').style.visibility=$('#next').style.visibility=(tab==='diary'||tab==='stats')?'visible':'hidden';
@@ -75,16 +75,16 @@ function vDiary(){ const L=day(cur), t=tot(L), g=S.goals, w=S.water[cur]||0; con
   let h=`<div class="card">${summary(t,g)}</div>`;
   h+=`<div class="card">`+MEALS.map(m=>{ const es=L.filter(e=>e.meal===m), mt=tot(es);
     return `<div class="meal"><div class="mh">${MI[m]} ${m[0].toUpperCase()+m.slice(1)} <span class="mu">${es.length?R(mt.k)+' ккал':''}</span><button class="add" data-addm="${m}">＋</button></div>`+
-     es.map(e=>`<div class="it" data-edit="${e.id}"><div class="n"><div>${esc(e.name)}</div><div class="mu">${R(e.g)} г · ${chips(e)}</div></div><div class="k">${R(e.k)}</div></div>`).join('')+`</div>` }).join('')+`</div>`;
-  if(S.set.water) h+=`<div class="card"><div class="row"><h2 class="sp">💧 Вода <span class="mu">${w} / ${g.w} мл</span></h2><button class="btn s sm" data-water="-250">−</button><button class="btn sm" data-water="250">＋250</button></div><div class="wt">${Array.from({length:Math.ceil(g.w/250)},(_,i)=>`<i class="${i<w/250?'f':''}"></i>`).join('')}</div></div>`;
+     es.map(e=>`<div class="it il" data-edit="${e.id}"><span class="n">${esc(e.name)}</span><span class="mu">${R(e.g)}г</span><span class="mac">${R(e.p)}·${R(e.f)}·${R(e.c)}</span><span class="k">${R(e.k)}</span></div>`).join('')+`</div>` }).join('')+`</div>`;
+  if(S.set.water) h+=`<div class="card row wrow"><b>💧 ${w}<span class="mu"> / ${g.w} мл</span></b><div class="wt sp">${Array.from({length:Math.ceil(g.w/250)},(_,i)=>`<i class="${i<w/250?'f':''}"></i>`).join('')}</div><button class="btn s sm" data-water="-250">−</button><button class="btn sm" data-water="250">＋250</button></div>`;
   return h+advHtml(adv,'day') }
 function periodKeys(mode){ const n=mode==='week'?7:30; return Array.from({length:n},(_,i)=>addD(cur,i-n+1)) }
-function chart(keys,key,goal,col,unit){ const W=400,H=130,vals=keys.map(k=>tot(day(k))[key]),mx=Math.max(goal*1.25,...vals,1),bw=W/keys.length;
+function chart(keys,key,goal,col,unit){ const W=400,H=95,vals=keys.map(k=>tot(day(k))[key]),mx=Math.max(goal*1.25,...vals,1),bw=W/keys.length;
   let s=`<svg viewBox="0 0 ${W} ${H+16}" width="100%"><line x1="0" x2="${W}" y1="${H-goal/mx*H}" y2="${H-goal/mx*H}" stroke="#738078" stroke-dasharray="4 4" stroke-width="1"/>`;
   vals.forEach((v,i)=>{const h=v/mx*H; s+=`<rect x="${i*bw+bw*.15}" y="${H-h}" width="${bw*.7}" height="${h}" rx="${Math.min(4,bw*.2)}" fill="${v>goal*1.08&&key==='k'?'#e04848':col}"/>`;
    if(keys.length<=7||i%5===0) s+=`<text x="${i*bw+bw/2}" y="${H+13}" font-size="11" text-anchor="middle" fill="#738078">${keys.length<=7?pd(keys[i]).toLocaleDateString('ru-RU',{weekday:'short'}):pd(keys[i]).getDate()}</text>`});
   return s+`</svg>` }
-function macroChart(keys){ const W=400,H=110,bw=W/keys.length; let mx=1; const ts=keys.map(k=>tot(day(k))); ts.forEach(t=>mx=Math.max(mx,t.p*4+t.f*9+t.c*4));
+function macroChart(keys){ const W=400,H=80,bw=W/keys.length; let mx=1; const ts=keys.map(k=>tot(day(k))); ts.forEach(t=>mx=Math.max(mx,t.p*4+t.f*9+t.c*4));
   let s=`<svg viewBox="0 0 ${W} ${H}" width="100%">`; ts.forEach((t,i)=>{let y=H;[['p',4,'#3b82f6'],['f',9,'#f59e0b'],['c',4,'#a855f7']].forEach(([k,m,c])=>{const h=t[k]*m/mx*H;y-=h;s+=`<rect x="${i*bw+bw*.15}" y="${y}" width="${bw*.7}" height="${h}" fill="${c}"/>`})}); return s+'</svg>' }
 function topFoods(list){ const m={}; list.forEach(e=>{const x=m[e.name]||(m[e.name]={n:e.name,k:0,c:0,p:0});x.k+=e.k;x.c++;x.p+=e.p}); return Object.values(m).sort((a,b)=>b.k-a.k).slice(0,8) }
 function vStats(){ const seg=`<div class="seg">${[['day','День'],['week','Неделя'],['month','Месяц']].map(([k,n])=>`<button data-sm="${k}" class="${statMode===k?'on':''}">${n}</button>`).join('')}</div>`; const g=S.goals;
@@ -92,18 +92,18 @@ function vStats(){ const seg=`<div class="seg">${[['day','День'],['week','Н
     let h=seg+`<div class="card">${summary(t,g)}</div><div class="card"><h2>По приёмам пищи</h2>${MEALS.map(m=>{const x=tot(L.filter(e=>e.meal===m));return `<div class="kv"><span>${MI[m]} ${m}</span><span><b>${R(x.k)}</b> ккал · ${chips(x)}</span></div>`}).join('')}
      <h3>Доля калорий</h3><div class="tr" style="display:flex;height:12px;border-radius:6px;overflow:hidden;background:#eef1ef"><i style="width:${t.p*4/kc*100}%;background:var(--P)"></i><i style="width:${t.f*9/kc*100}%;background:var(--F)"></i><i style="width:${t.c*4/kc*100}%;background:var(--C)"></i></div>
      <div class="mu">Белки ${R(t.p*4/kc*100)}% · Жиры ${R(t.f*9/kc*100)}% · Углеводы ${R(t.c*4/kc*100)}%</div></div>`;
-    const tf=topFoods(L); h+=`<div class="card"><h2>Топ продуктов дня</h2>${tf.length?tf.map(x=>`<div class="kv"><span>${esc(x.n)}</span><b>${R(x.k)} ккал</b></div>`).join(''):'<div class="empty">Нет записей</div>'}</div>`;
+    const tf=topFoods(L); h+=`<details class="card col" data-k="c_topd" ${S.set.c_topd?'open':''}><summary class="row"><h2 class="sp">Топ продуктов дня</h2><span class="chev">›</span></summary>${tf.length?tf.map(x=>`<div class="kv"><span>${esc(x.n)}</span><b>${R(x.k)} ккал</b></div>`).join(''):'<div class="empty">Нет записей</div>'}</details>`;
     lastAdv.stat=advice(L,g,{water:S.water[cur]||0}); return h+vNutri([cur])+advHtml(lastAdv.stat,'stat') }
   const keys=periodKeys(statMode), act=keys.filter(k=>day(k).length), n=Math.max(1,act.length), all=keys.flatMap(day), T=tot(all), av={k:T.k/n,p:T.p/n,f:T.f/n,c:T.c/n};
   let h=seg+`<div class="card"><h2>Среднее за день <span class="mu">(${act.length} дн. с записями)</span></h2>${summary(av,g)}</div>`+vNutri(keys);
   h+=`<div class="card"><h2>Калории <span class="mu">— пунктир: цель ${g.k}</span></h2>${chart(keys,'k',g.k,'#0f7a5a')}</div>`;
   h+=`<div class="card"><h2>Б/Ж/У (ккал) <span class="mu"><span style="color:var(--P)">■</span> Б <span style="color:var(--F)">■</span> Ж <span style="color:var(--C)">■</span> У</span></h2>${macroChart(keys)}<div class="g3" style="margin-top:6px;text-align:center"><div><b>${R(av.p)}</b><div class="mu">белки ср., г</div></div><div><b>${R(av.f)}</b><div class="mu">жиры ср., г</div></div><div><b>${R(av.c)}</b><div class="mu">углеводы ср., г</div></div></div></div>`;
-  h+=`<div class="card"><h2>Белок по дням</h2>${chart(keys,'p',g.p,'#3b82f6')}</div>`;
-  const tf=topFoods(all); h+=`<div class="card"><h2>Топ продуктов</h2>${tf.length?tf.map(x=>`<div class="kv"><span>${esc(x.n)} <span class="mu">×${x.c}</span></span><b>${R(x.k)} ккал</b></div>`).join(''):'<div class="empty">Нет записей</div>'}</div>`;
+  h+=`<details class="card col" data-k="c_prot" ${S.set.c_prot?'open':''}><summary class="row"><h2 class="sp">Белок по дням</h2><span class="chev">›</span></summary>${chart(keys,'p',g.p,'#3b82f6')}</details>`;
+  const tf=topFoods(all); h+=`<details class="card col" data-k="c_top" ${S.set.c_top?'open':''}><summary class="row"><h2 class="sp">Топ продуктов</h2><span class="chev">›</span></summary>${tf.length?tf.map(x=>`<div class="kv"><span>${esc(x.n)} <span class="mu">×${x.c}</span></span><b>${R(x.k)} ккал</b></div>`).join(''):'<div class="empty">Нет записей</div>'}</details>`;
   lastAdv.stat=periodAdvice(keys); return h+advHtml(lastAdv.stat,'stat') }
 function vNutri(keys){ const r=NUTRI.analyze({days:keys.map(k=>({key:k,entries:day(k),water:S.water[k]||0})),goals:S.goals,prof:S.prof,tdee:mifflin(S.prof).tdee,mode:statMode,trackWater:S.set.water}); lastAdv.nutri=[[0,r.speech]];
   const col=r.score>=8?'var(--g)':r.score>=5?'var(--F)':'var(--red)';
-  return `<details class="card nutri" ${S.set.nutriOpen!==false?'open':''}><summary class="row"><h2 class="sp" style="margin:0">🩺 Нутрициолог</h2>${r.empty?'':`<span class="score" style="background:${col}">${r.score}/10</span>`}<button class="btn s sm" data-say="nutri" onclick="event.preventDefault()">🔊</button><span class="chev">›</span></summary>
+  return `<details class="card nutri" ${S.set.nutriOpen?'open':''}><summary class="row"><h2 class="sp" style="margin:0">🩺 Нутрициолог</h2>${r.empty?'':`<span class="score" style="background:${col}">${r.score}/10</span>`}<button class="btn s sm" data-say="nutri" onclick="event.preventDefault()">🔊</button><span class="chev">›</span></summary>
   ${r.empty?`<div class="mu" style="margin-top:6px">${esc(r.plan[0])}</div>`:`
   <h3>👍 Сильные стороны</h3>${r.strengths.map(x=>`<div class="adv"><span>✅</span><span>${esc(x.t)}</span></div>`).join('')||'<div class="mu">—</div>'}
   <h3>⚠️ Что улучшить</h3>${r.problems.map(x=>`<div class="adv"><span>🔸</span><span>${esc(x.t)}${x.swap?`<br><b class="swap">→ ${esc(x.swap)}</b>`:''}</span></div>`).join('')||'<div class="mu">Серьёзных проблем нет.</div>'}
@@ -258,7 +258,7 @@ document.addEventListener('input',e=>{ const t=e.target,d=t.dataset;
   if(/^g[kpfc]$/.test(t.id)){ const k=+$('#gk').value,s=(+$('#gp').value)*4+(+$('#gf').value)*9+(+$('#gc').value)*4; $('#gsum').textContent=`Б/Ж/У дают ${R(s)} ккал (${k?R(s/k*100):0}% от цели)`; return }
   if(t.id==='sauto'){S.set.auto=t.checked;save();return} if(t.id==='swater'){S.set.water=t.checked;save();return}
 });
-document.addEventListener('toggle',e=>{ if(e.target.classList&&e.target.classList.contains('nutri')){S.set.nutriOpen=e.target.open;save()} },true);
+document.addEventListener('toggle',e=>{ const t=e.target; if(!t.classList)return; if(t.classList.contains('nutri')){S.set.nutriOpen=t.open;save()} else if(t.dataset&&t.dataset.k){S.set[t.dataset.k]=t.open;save()} },true);
 document.addEventListener('change',e=>{ const t=e.target,d=t.dataset; if(d.imeal!=null){V.items[+d.imeal].meal=t.value;return}
   if(t.id==='imp'&&t.files[0]){ t.files[0].text().then(x=>{ const j=JSON.parse(x); if(!j.days)throw 0; if(!confirm('Заменить текущие данные импортом?'))return; S=Object.assign(def(),j); save(); dirty(); render(); toast('Импортировано') }).catch(()=>toast('Неверный файл')) } });
 document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&e.target.id==='pq'){e.preventDefault();showRes()} });
