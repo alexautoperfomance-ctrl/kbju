@@ -1,6 +1,6 @@
 import asyncio,json,random,datetime,sys
 from playwright.async_api import async_playwright
-URL='http://127.0.0.1:18437/'
+URL=sys.argv[1] if len(sys.argv)>1 else 'http://127.0.0.1:18437/'
 FAKE='''
 window.__said=[];window.__tts=[];
 class FakeSR{constructor(){this.lang='';}start(){const t=window.__nextTranscript||'';setTimeout(()=>{this.onresult&&this.onresult({results:[Object.assign([{transcript:t}],{isFinal:true})]});setTimeout(()=>this.onend&&this.onend(),50)},200)}stop(){this.onend&&this.onend()}}
