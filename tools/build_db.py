@@ -27,7 +27,7 @@ for line in open('tools/data_base.txt',encoding='utf8'):
 EX=json.load(open('tools/extra_resolved.json',encoding='utf8'))
 for x in EX:
     pc=float(x['pc']) if x['pc'] else None
-    add(x['n'],x['s'].split('/') if x['s'] else [],x['k'],x['p'],x['f'],x['c'],pc,float(x['po']),x['cat'],'base')
+    add(x['n'],x['s'].split('/') if x['s'] else [],x['k'],x['p'],x['f'],x['c'],pc,float(x['po']),'dairy' if x['cat']=='dairyfix' else x['cat'],'base')
     items[x['n']]['pl']=1 if x['g']=='p' else 0
     if x['rf'] and float(x['rf'])>0: items[x['n']]['rf']=float(x['rf'])
     if x['cat'] in('fruit','veg','fish','meat') and not re.search(r'консерв|сушен|коктейль|кишмиш|красный',x['n']):
