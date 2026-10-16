@@ -63,7 +63,7 @@ function score(d,vctx){ return Object.entries(d.check).reduce((s,[k,v])=>s+(v?0:
 function genDay1(ctx,opt,seed,vctx){ const S=ctx.S||(ctx.S=setup(ctx)); const rnd=rng(seed); const meals=mealsFor(opt.meals||5);
   const slots=[]; meals.forEach(m=>T[m].forEach((groups,si)=>{ const pool=poolFor(groups,opt,S); if(pool.length)slots.push({m:m==='перекус2'?'перекус':m,mk:m,si,pool}) }));
   const pick=sl=>{ const used=new Set(slots.map(s=>s.it&&s.it.n)); const c=sl.pool.filter(c=>!used.has(c.n)); const w=c.map(x=>Math.exp(-varPen(x,vctx)/3)*(.5+rnd())); let b=0; w.forEach((x,i)=>{if(x>w[b])b=i}); return c[b] };
-  slots.forEach(sl=>{ const c=pick(sl); sl.it=Object.assign({},c,{g:c.typ}) });
+  slots.forEach(sl=>{ const c=pick(sl); sl.it=c?Object.assign({},c,{g:c.typ}):null }); for(let i=slots.length-1;i>=0;i--) if(!slots[i].it)slots.splice(i,1);
   const items=()=>slots.map(s=>s.it); let L=fitGrams(items(),ctx,S)+slots.reduce((s,x)=>s+varPen(x.it,vctx),0);
   // локальный поиск по выбору продуктов
   for(let round=0;round<5;round++){ let imp=false;

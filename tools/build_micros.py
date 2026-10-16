@@ -80,6 +80,32 @@ COMP=[(r'борщ','свекла:14,капуста белокочанная:12,�
  (r'колбас|сосиск|сарделк|шпикачк|колбаск|буженин|ветчин|тушенк','колбаса вареная:100'),(r'наггетс|в кляре|палочк|кольца','куриные наггетсы:100'),(r'творог с|творог со','творог:80,сметана:10'),(r'кефир с','кефир:90,отруби:5'),
  (r'мюсли с|хлопья с|гранол|йогурт с','мюсли:30,молоко:60'),(r'кофе|капучино|латте|раф|флэт|какао|горячий шоколад|матча|чай масала','молоко:40,кофе:60'),(r'коктейль|смузи','молоко:50,банан:20'),(r'мохито|сбитень','лимонад:100'),
  (r'изотоник','вода:100'),(r'чай','чай:100'),(r'соус|аджика','помидор:40,масло подсолнечное:10'),(r'сало','свиное сало:100'),(r'специи','перец болгарский:50'),(r'сахарозамен','вода:100')]
+import sys; sys.path.insert(0,'tools'); import cook
+# способы приготовления: выход USDA + сохранность [R6] + микро впитанного масла
+DCOOK=json.load(open('tools/derived_cook.json',encoding='utf8'))
+for n,d in DCOOK.items():
+    if n in U or d['b'] not in U: continue
+    rt=cook.RET.get(d['m'],{}); v=[(x or 0)/d['y']*rt.get(KEYS[i],1) for i,x in enumerate(U[d['b']])]
+    if d['oil']:
+        for i,x in enumerate(U['масло подсолнечное']): v[i]+=(x or 0)*d['oil']*.98/100/d['y']
+    U[n]=v; S[n]='d'
+# блюда по рецептурам: сумма ингредиентов × сохранность / выход
+DB_=json.load(open('tools/dishes_built.json',encoding='utf8'))
+def uv(nm):
+    if nm in U: return U[nm]
+    b=DER.get(nm)
+    return U.get(b) if b else None
+for d in DB_:
+    rt=cook.RET.get('soup' if d['m']=='soup' else d['m'],{}); v=blank(); ok=True
+    for nm,g in d['ing']:
+        if nm=='вода': continue
+        u=uv(nm)
+        if u is None: ok=False; break
+        for i,x in enumerate(u): v[i]+=(x or 0)*g/100
+    if not ok: continue
+    sc=100/max(1,d['cooked'])
+    if d.get('ref') and d['calc'][0]>5: sc*=d['ref'][0]/d['calc'][0]
+    U[d['n']]=[x*sc*rt.get(KEYS[i],1) for i,x in enumerate(v)]; S[d['n']]='r'
 def mix(spec):
     v=blank()
     for part in spec.split(','):
@@ -118,6 +144,11 @@ for f in FOODS:
         dc=f['c']-B['c']*r
         if dc>1 and ('сахар' in n or 'сироп' in n or 'мед' in n): v[IDX['Sug']]+=dc
         U[n]=v; S[n]='d'
+OFFR={x['n']:x for x in json.load(open('tools/off_ru.json',encoding='utf8'))}
+for f in FOODS:  # OFF Россия: натрий/сахар/клетчатка с упаковки, прочее — оценка
+    x=OFFR.get(f['n'])
+    if not x or f['n'] in U: continue
+    v=blank(); v[IDX['Na']]=(x['na'] or 0.05)*1000; v[IDX['Sug']]=x['su'] or 0; v[IDX['Fib']]=x['fi'] or 0; U[f['n']]=v; S[f['n']]='o'
 for f in FOODS: # всё остальное — оценка по категории (масштаб по кбжу от «средней» еды)
     if f['n'] in U: continue
     v=blank(); v[IDX['Na']]=50; U[f['n']]=v; S[f['n']]='e'
@@ -133,7 +164,7 @@ def r3(x):
 M={f['n']:[r3(x) for x in U[f['n']]] for f in FOODS}
 from collections import Counter
 cnt=Counter(S[f['n']] for f in FOODS)
-js='// Микронутриенты на 100 г. Порядок: self.MK. Источник: self.MSRC (u=USDA SR Legacy, d=производное от USDA, c=по составу из USDA-ингредиентов, e=оценка). B7/йод/хром — оценки (в SR Legacy нет).\n'
+js='// Микронутриенты на 100 г. Порядок: self.MK. Источник: self.MSRC (u=USDA SR Legacy, d=производное от USDA (выход/сохранность USDA), r=по рецептуре из USDA-ингредиентов, c=по составу из USDA-ингредиентов, e=оценка). B7/йод/хром — оценки (в SR Legacy нет).\n'
 js+='self.MK='+json.dumps(KEYS)+';self.MSRC='+json.dumps({k:S[k] for k in M},ensure_ascii=False,separators=(',',':'))+';\nself.MICRO='+json.dumps(M,ensure_ascii=False,separators=(',',':'))+';\n'
 open('micro.js','w',encoding='utf8').write(js)
 print(dict(cnt),'total',len(FOODS),'KB',len(js)//1024)

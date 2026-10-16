@@ -1,5 +1,5 @@
 'use strict';
-const VER='1.7.1';
+const VER='1.8.0';
 const $=s=>document.querySelector(s), R=Math.round, esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const MEALS=['завтрак','обед','ужин','перекус'], MI={завтрак:'🍳',обед:'🍲',ужин:'🍽️',перекус:'🍎'};
 const KEY='kbju.v1';
@@ -16,7 +16,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const fmtD=k=>{const d=pd(k),t=dk();const s=d.toLocaleDateString('ru-RU',{day:'numeric',month:'short',weekday:'short'});return k===t?'Сегодня, '+s.replace(/^[^,]+,\s*/,''):k===addD(t,-1)?'Вчера, '+s.replace(/^[^,]+,\s*/,''):s};
 function toast(t){const e=$('#toast');e.textContent=t;e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',2600)}
 // ---------- индекс поиска ----------
-let IX=null; function index(){ if(!IX){ const rec=S.recipes.map(r=>Object.assign(recipeNut(r),{n:r.name,s:r.syn||[],rid:r.id,po:R(r.yield/Math.max(1,r.servings)),src:'recipe'}));
+let IX=null; function index(){ if(!IX){ const rec=S.recipes.map(r=>Object.assign(recipeNut(r),{n:r.name,s:r.syn||[],rid:r.id,po:R(ryOf(r)/Math.max(1,r.servings)),src:'recipe'}));
   const cus=S.custom.map(c=>Object.assign({},c,{used:S.used[c.n]})); const foods=self.FOODS.map(f=>S.used[f.n]?Object.assign({},f,{used:S.used[f.n]}):f);
   IX=KP.makeIndex(foods.concat(cus),rec) } return IX }
 function dirty(){IX=null}
@@ -136,9 +136,9 @@ function vNutri(keys){ const ma=MICROS.analyze(keys.map(day),S.prof,MK,microLook
   <h3>📋 План на завтра</h3><ol class="plan">${r.plan.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>
   <div class="mu">Расход ~${R(r.tdee)} ккал · клетчатка ~${R(r.metrics.fiber)} г · овощи/фрукты ~${R(r.metrics.veg)} г · разных продуктов за 7 дн.: ${r.metrics.distinctWeek}</div>`}
   <div class="mu" style="margin-top:6px;font-size:.72rem">ℹ️ Автоматический разбор по правилам, не медицинская рекомендация. При заболеваниях — к врачу/диетологу.</div></details>` }
-function recipeNut(r){ const s=r.ings.reduce((a,i)=>(a.k+=i.k*i.g/100,a.p+=i.p*i.g/100,a.f+=i.f*i.g/100,a.c+=i.c*i.g/100,a.g+=i.g,a),{k:0,p:0,f:0,c:0,g:0}); const y=r.yield||s.g||1;
-  const m=new Array(MK.length).fill(0); r.ings.forEach(i=>{ const v=i.m||(self.MICRO&&self.MICRO[i.n]); if(v)v.forEach((x,j)=>m[j]+=(+x||0)*i.g/y) });
-  return {k:s.k/y*100,p:s.p/y*100,f:s.f/y*100,c:s.c/y*100,raw:s.g,m} }
+function recipeNut(r){ const ings=r.ings.map(i=>{ const f=fdb(i.n); return Object.assign({},i,{cat:i.cat||(f&&f.cat)||'',m:i.m||(self.MICRO&&self.MICRO[i.n])}) });
+  const raw=ings.reduce((a,i)=>a+(+i.g||0),0); const x=COOK.recipe(ings,r.meth||'raw',MK,ywOf(r)); return {k:x.k,p:x.p,f:x.f,c:x.c,raw,m:x.m,cooked:x.cooked,oil:x.oil,y:ywOf(r)||x.cooked} }
+const ywOf=r=>(r.yw||(r.yw===undefined&&r.yield))&&r.yield?r.yield:0; const ryOf=r=>recipeNut(r).y;
 // ---------- 🍽 Меню: сбалансированная неделя ----------
 const WD=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'], MEXCL=['рыба','мясо','свинина','молочное','яйца','глютен','орехи'];
 function mctx(){ return {foods:self.FOODS,MICRO:self.MICRO,MK,norms:MICROS.norms(S.prof),goals:{k:S.goals.k,p:S.goals.p,f:S.goals.f,c:S.goals.c}} }
@@ -183,8 +183,8 @@ function menuChange(t){ if(!S.menu)return false; const o=Object.assign({},mopt()
   S.set.m_set=true; mGen(o); render.keep=true; render(); toast('Меню пересоставлено'); return true }
 function vRecipes(){ let h=`<div class="card"><div class="row"><h2 class="sp">Мои рецепты</h2><button class="btn sm" data-newrec="1">＋ Рецепт</button></div><div class="mu">Добавляй голосом по названию: «мой плов 300 грамм» или «порция борща мамы».</div></div>`;
   if(!S.recipes.length) h+=`<div class="card empty">Рецептов пока нет.<br>Создай рецепт вручную или надиктуй ингредиенты.<br><br><button class="btn" data-newrec="voice">🎙️ Надиктовать рецепт</button></div>`;
-  S.recipes.forEach(r=>{const n=recipeNut(r),sv=r.yield/Math.max(1,r.servings);h+=`<div class="card"><div class="row"><h2 class="sp">${esc(r.name)}</h2><button class="btn s sm" data-recinfo="${r.id}" aria-label="Состав порции">ⓘ</button><button class="btn s sm" data-editrec="${r.id}">✎</button><button class="btn sm" data-userec="${r.id}">В дневник</button></div>
-   <div class="mu">${r.ings.length} ингр. · выход ${R(r.yield)} г · ${r.servings} порц. по ${R(sv)} г</div>
+  S.recipes.forEach(r=>{const n=recipeNut(r),sv=n.y/Math.max(1,r.servings);h+=`<div class="card"><div class="row"><h2 class="sp">${esc(r.name)}</h2><button class="btn s sm" data-recinfo="${r.id}" aria-label="Состав порции">ⓘ</button><button class="btn s sm" data-editrec="${r.id}">✎</button><button class="btn sm" data-userec="${r.id}">В дневник</button></div>
+   <div class="mu">${r.ings.length} ингр. · выход ${R(n.y)} г · ${r.servings} порц. по ${R(sv)} г</div>
    <div class="kv"><span>на 100 г</span><span><b>${R(n.k)}</b> ккал · ${chips(n)}</span></div><div class="kv"><span>на порцию</span><span><b>${R(n.k*sv/100)}</b> ккал · ${chips({p:n.p*sv/100,f:n.f*sv/100,c:n.c*sv/100})}</span></div></div>`});
   return h }
 function mifflin(p){ const b=10*p.w+6.25*p.h-5*p.a+(p.sex==='m'?5:-161), tdee=b*p.act, k=tdee*(p.goal==='lose'?.82:p.goal==='gain'?1.1:1);
@@ -199,7 +199,7 @@ function vGoals(){ const g=S.goals,p=S.prof,m=mifflin(p);
   <label>Цель</label><select id="cg">${[['lose','похудение (−18%)'],['keep','поддержание'],['gain','набор массы (+10%)']].map(([v,n])=>`<option value="${v}" ${p.goal===v?'selected':''}>${n}</option>`).join('')}</select>
   <div id="calc" style="margin-top:8px">${calcHtml(m)}</div><button class="btn w s" data-applycalc="1">Применить к целям</button></div>` }
 const calcHtml=m=>`<div class="kv"><span>Базовый обмен</span><b>${R(m.bmr)} ккал</b></div><div class="kv"><span>С активностью</span><b>${R(m.tdee)} ккал</b></div><div class="kv"><span>Рекомендуемо</span><b>${m.k} ккал · Б ${m.p} · Ж ${m.f} · У ${m.c}</b></div>`;
-function vMore(){ return `<div class="card"><h2>Настройки</h2><div class="tog"><span>💧 Учёт воды</span><input type="checkbox" id="swater" ${S.set.water?'checked':''}></div><div class="tog"><span>🐞 Отладка микрофона (строка событий)</span><input type="checkbox" id="smicdbg" ${S.set.micdbg?'checked':''}></div>
+function vMore(){ return `<div class="card"><h2>Настройки</h2><div class="tog"><span>💧 Учёт воды</span><input type="checkbox" id="swater" ${S.set.water?'checked':''}></div><div class="row" style="margin:6px 0"><button class="btn s sp" data-sources="1">📚 Источники данных</button></div><div class="tog"><span>🐞 Отладка микрофона (строка событий)</span><input type="checkbox" id="smicdbg" ${S.set.micdbg?'checked':''}></div>
   <div class="mu">Голос: ${SR?'распознавание речи доступно':'встроенное распознавание недоступно — используй 🎤 на клавиатуре iPhone'}${isIOS?' · iOS':''}${standalone?' · приложение':''}</div></div>
   <div class="card"><h2>Данные</h2><div class="mu">Всё хранится только на этом устройстве. Делай резервную копию.</div><div class="row" style="margin-top:8px"><button class="btn s sp" data-export="1">⬇️ Экспорт</button><label class="btn s sp" style="margin:0;text-align:center;color:var(--g);font-size:.95rem">⬆️ Импорт<input type="file" id="imp" accept=".json,application/json" hidden></label></div>
   <button class="btn r w" style="margin-top:8px" data-wipe="1">Удалить все данные</button></div>
@@ -279,7 +279,7 @@ let PK=null; // {cb, q}
 function openPicker(q,cb,alts){ PK={cb}; sheet(`<div class="sh"><h2>Выбор продукта</h2><button class="x" data-close2="1">✕</button></div><div class="row"><input id="pq" placeholder="Поиск: творог, борщ, сырники…" value="${esc(q||'')}">${micBtn('pq','search')}<button class="btn s" data-scan="1" title="Штрихкод">▥</button></div>
   <div class="row" style="margin-top:6px"><button class="btn s sm" data-off="1">🌐 Open Food Facts</button><button class="btn s sm" data-custom="1">＋ Свой продукт</button></div><div id="pres"></div>`,2);
   showRes(alts&&alts.length&&!q?alts:null); if(!alts||!alts.length||q)showRes() }
-function resHtml(list){ return list.map((f,i)=>`<div class="res" data-pf="${i}"><div class="n"><div>${esc(f.n)}${f.src==='off'?' <span class="mu">OFF</span>':f.src==='recipe'?' <span class="mu">рецепт</span>':''}</div><div class="mu">${chips(f)}${f.pc?' · 1 шт ≈ '+f.pc+' г':''}</div></div><b>${R(f.k)}</b><span class="mu">/100 г</span><button class="inf" data-pinfo="${i}" aria-label="Состав">ⓘ</button></div>`).join('')||'<div class="empty">Ничего не найдено. Попробуй Open Food Facts или добавь свой продукт.</div>' }
+function resHtml(list){ return list.map((f,i)=>`<div class="res" data-pf="${i}"><div class="n"><div>${esc(f.n)}${f.src==='off'||f.src==='offru'?' <span class="mu">OFF</span>':f.src==='recipe'?' <span class="mu">рецепт</span>':''}</div><div class="mu">${chips(f)}${f.pc?' · 1 шт ≈ '+f.pc+' г':''}</div></div><b>${R(f.k)}</b><span class="mu">/100 г</span><button class="inf" data-pinfo="${i}" aria-label="Состав">ⓘ</button></div>`).join('')||'<div class="empty">Ничего не найдено. Попробуй Open Food Facts или добавь свой продукт.</div>' }
 let PR=[]; function showRes(list){ const q=($('#pq')||{}).value||''; PR=list||(q.trim()?KP.search(index(),q,25).map(x=>x.food):[]); $('#pres').innerHTML=resHtml(PR) }
 function offMap(p){ const n=p.nutriments||{}, k=n['energy-kcal_100g']!=null?n['energy-kcal_100g']:(n.energy_100g||n['energy-kj_100g']||0)/4.184, br=Array.isArray(p.brands)?p.brands[0]:p.brands;
   const OM={A:['vitamin-a',1e6],D:['vitamin-d',1e6],E:['vitamin-e',1e3],K:['vitamin-k',1e6],C:['vitamin-c',1e3],B1:['vitamin-b1',1e6],B2:['vitamin-b2',1e6],B3:['vitamin-pp',1e3],B5:['pantothenic-acid',1e3],B6:['vitamin-b6',1e6],B7:['biotin',1e6],B9:['vitamin-b9',1e6],B12:['vitamin-b12',1e6],Ch:['choline',1e3],Ca:['calcium',1e3],P:['phosphorus',1e3],Mg:['magnesium',1e3],K_:['potassium',1e3],Na:['sodium',1e3],Fe:['iron',1e3],Zn:['zinc',1e3],Cu:['copper',1e6],Mn:['manganese',1e6],Se:['selenium',1e6],I:['iodine',1e6],Cr:['chromium',1e6],Fib:['fiber',1],Sug:['sugars',1],Chol:['cholesterol',1e3],O3:['omega-3-fat',1e3]};
@@ -312,10 +312,12 @@ function openRecipe(r){ if(r)RE=JSON.parse(JSON.stringify(r)); if(!RE)RE={id:uid
   sheet(`<div class="sh"><h2>${RE._new?'Новый рецепт':'Рецепт'}</h2><button class="x" data-close="1">✕</button></div><label>Название (как будешь говорить)</label><div class="row"><input id="rn" value="${esc(RE.name)}" placeholder="мой плов">${micBtn('rn','none')}</div>
   <h3>Ингредиенты</h3>${RE.ings.map((i,k)=>`<div class="it"><div class="n"><div>${esc(i.n)}</div><div class="mu">${R(i.k*i.g/100)} ккал</div></div><input style="width:80px" type="number" inputmode="numeric" data-rg="${k}" value="${R(i.g)}"><span class="mu">г</span><button data-rdel="${k}">✕</button></div>`).join('')||'<div class="mu">Пока пусто</div>'}
   <div class="row" style="margin-top:6px"><button class="btn s sp" data-radd="1">＋ Ингредиент</button><button class="btn s sp" data-rvoice="1">🎙️ Надиктовать</button></div>
-  <div class="g2"><div><label>Выход готового блюда, г</label><input id="ry" type="number" inputmode="numeric" value="${R(RE.yield||raw)}"></div><div><label>Порций</label><input id="rs" type="number" inputmode="numeric" value="${RE.servings}"></div></div><div class="mu">Сырой вес ингредиентов: ${R(raw)} г. После варки/жарки взвесь готовое блюдо.</div>
-  <div class="card" style="margin-top:8px"><div class="kv"><span>на 100 г</span><span><b>${R(n.k)}</b> ккал · ${chips(n)}</span></div><div class="kv"><span>на порцию</span><span><b>${R(n.k*(RE.yield||raw)/Math.max(1,RE.servings)/100)}</b> ккал</span></div></div>
+  <div class="g2"><div><label>Способ приготовления</label><select id="rm">${COOK.METH.map(([k,t])=>`<option value="${k}" ${(RE.meth||'raw')===k?'selected':''}>${t}</option>`).join('')}</select></div><div><label>Порций</label><input id="rs" type="number" inputmode="numeric" value="${RE.servings}"></div></div>
+  <div class="g2"><div><label>Выход готового, г ${RE.yw?'<span class="mu">(взвешено)</span>':'<span class="mu">(расчёт)</span>'}</label><input id="ry" type="number" inputmode="numeric" value="${R(n.y)}"></div><div style="align-self:end">${RE.yw?'<button class="btn s sm" data-ryreset="1">↺ по расчёту</button>':''}</div></div>
+  <div class="mu">Сырые ингредиенты: ${R(raw)} г → готовое ≈ ${R(n.cooked)} г${n.oil?` (+${n.oil} г впитанного масла)`:''} по коэффициентам USDA. Взвесил готовое — впиши свой вес.</div>
+  <div class="card" style="margin-top:8px"><div class="kv"><span>на 100 г</span><span><b>${R(n.k)}</b> ккал · ${chips(n)}</span></div><div class="kv"><span>на порцию</span><span><b>${R(n.k*n.y/Math.max(1,RE.servings)/100)}</b> ккал</span></div></div>
   <div class="row"><button class="btn sp" data-rsave="1">Сохранить</button>${RE._new?'':'<button class="btn r" data-rremove="1">Удалить</button>'}</div>`) }
-function syncRecipe(){ const n=$('#rn'); if(!n)return; RE.name=n.value.trim(); RE.yield=+$('#ry').value||0; RE.servings=Math.max(1,+$('#rs').value||1); document.querySelectorAll('[data-rg]').forEach(x=>RE.ings[+x.dataset.rg].g=+x.value||0) }
+function syncRecipe(){ const n=$('#rn'); if(!n)return; RE.name=n.value.trim(); if(RE.yw===undefined)RE.yw=!!RE.yield; if($('#rm'))RE.meth=$('#rm').value; const y=+$('#ry').value||0; if(y&&Math.abs(y-recipeNut(RE).y)>=1){RE.yield=y;RE.yw=true} RE.servings=Math.max(1,+$('#rs').value||1); document.querySelectorAll('[data-rg]').forEach(x=>RE.ings[+x.dataset.rg].g=+x.value||0) }
 // ---------- запись ----------
 // Детали порции: КБЖУ, клетчатка, сахара, все витамины/минералы с % нормы
 function detailHtml(name,g,f100,m100){ const nm=MICROS.norms(S.prof), k=MK, n=KP.nutr(f100,g), m=m100||microOf(name);
@@ -327,6 +329,20 @@ function detailHtml(name,g,f100,m100){ const nm=MICROS.norms(S.prof), k=MK, n=KP
    <div class="mu" style="margin:2px 0 4px">${R(f100.k)} ккал на 100 г · % — от дневной нормы (${R(n.k/Math.max(1,S.goals.k)*100)}% калорий)</div>
    ${m?`<div class="dgrid">${nm.filter(d=>d.k!=='Fib'&&d.k!=='Sug').map(row).join('')}</div>`:'<div class="mu">Для этого продукта нет данных о витаминах и минералах.</div>'}` }
 let DT=null; // {name,f100,m100,g,mode,id}
+const MSRCT={u:'USDA SR Legacy',d:'USDA + коэффициенты приготовления (выход, сохранность R6)',r:'расчёт по рецептуре из USDA-ингредиентов',c:'оценка по типовому составу',o:'Open Food Facts (упаковка)',e:'оценка'};
+function srcLine(n){ const f=fdb(n); if(!f)return ''; const m=self.MSRC&&self.MSRC[n];
+  const kb=f.ds==='ru-ref'?'российский справочник'+(f.rs?' ('+f.rs+')':''):f.ds==='recipe'?'рецептура (расчёт)':f.ds==='off-ru'?'Open Food Facts Россия'+(f.code?' · '+f.code:''):f.src==='derived'?'производное':'база (Скурихин/USDA)';
+  return `<div class="mu" style="margin-top:2px;font-size:.66rem">📚 КБЖУ: ${esc(kb)} · микро: ${esc(MSRCT[m]||'—')} · <button class="lnk" data-sources="1">источники</button></div>` }
+function openSources(){ const n=self.FOODS.length, c=k=>self.FOODS.filter(f=>f.ds===k).length, ms=k=>Object.values(self.MSRC).filter(x=>x===k).length;
+  sheet(`<div class="sh"><h2>📚 Источники данных</h2><button class="x" data-close="1">✕</button></div><div class="srcs">
+  <p><b>База: ${n} позиций.</b> Значения на 100 г съедобной части.</p>
+  <p><b>КБЖУ</b><br>• «Химический состав российских пищевых продуктов», Скурихин И.М., Тутельян В.А. (2002) — молочные, колбасы, хлеб, крупы, кондитерские; ${c('ru-ref')} позиций помечены как российский справочник. <i>Файл не скачивался — справочные значения внесены вручную по известным таблицам.</i><br>
+  • Сборник рецептур блюд и кулинарных изделий для предприятий общественного питания (1996) — рецептуры и выходы; ${c('recipe')+c('ru-ref')>0?self.FOODS.filter(f=>f.ds==='recipe').length:0} блюд рассчитаны по рецептуре. <i>Тоже не скачивался.</i><br>
+  • USDA FoodData Central, SR Legacy (2018, public domain) — скачано; фрукты, овощи, рыба, мясо, орехи, ингредиенты блюд.<br>
+  • Open Food Facts (ODbL), экспорт с фильтром «страна: Россия» — скачано; ${c('off-ru')} популярных упакованных продуктов с проверкой КБЖУ (Атуотер ±15%).</p>
+  <p><b>Приготовление</b><br>• USDA Table of Cooking Yields for Meat and Poultry (2014) — выход мяса/птицы при варке, жарке, тушении, запекании, гриле.<br>• USDA SR Legacy: пары «сухой/отварной» — уварка круп, бобовых, макарон.<br>• USDA Table of Nutrient Retention Factors, Release 6 (2007) — сохранность витаминов и минералов.<br>• Впитывание масла при жарке — по нормам Сборника рецептур / USDA FNDDS.</p>
+  <p><b>Микронутриенты</b>: USDA ${ms('u')} · производные ${ms('d')} · по рецептуре ${ms('r')} · по составу ${ms('c')} · OFF ${ms('o')} · оценка ${ms('e')}. Нормы — МР 2.3.1.0253-21.</p>
+  <p class="mu">Значения — справочные средние; конкретный продукт может отличаться. Для упакованных продуктов точнее этикетка или штрихкод.</p></div>`) }
 function edNote(o){ const f=fdb(o.name); if(o.note)return `<div class="mu" id="dnote" style="margin-top:4px">🍽 ${esc(o.note)}</div>`; if(!f||!f.rf)return '';
   const w=f.cat==='nut'?'ядра':/яйц/.test(f.n)?'без скорлупы':/fish|meat/.test(f.cat||'')?'без костей':'мякоти';
   return `<div class="mu" id="dnote" style="margin-top:4px">🍽 Вес — съедобная часть${f.pc?` · 1 шт ≈ ${R(f.pc)} г ${w}`:''} · отходы ${R(f.rf)}%</div>` }
@@ -334,7 +350,7 @@ function openDetail(o){ DT=o; const isE=o.mode==='entry';
   sheet(`<div class="sh"><h2 style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(o.name)}</h2><button class="x" data-close${isE?'':'2'}="1">✕</button></div>
   <div class="row"><div style="width:96px"><input id="dg" type="number" inputmode="numeric" value="${R(o.g)}" aria-label="Граммы"></div><span class="mu">г</span>
    ${isE||o.mode==='add'?`<select id="dm" class="sp">${MEALS.map(m=>`<option ${o.meal===m?'selected':''}>${m}</option>`).join('')}</select>`:'<span class="sp"></span>'}</div>
-  ${edNote(o)}<div id="dbody" style="margin-top:6px">${detailHtml(o.name,o.g,o.f100,o.m100)}</div>
+  ${edNote(o)}${srcLine(o.name)}<div id="dbody" style="margin-top:6px">${detailHtml(o.name,o.g,o.f100,o.m100)}</div>
   <div class="row" style="margin-top:8px">${isE?`<button class="btn sp" data-esave="${o.id}">Сохранить</button><button class="btn s" data-ecopy="${o.id}">На сегодня</button><button class="btn r" data-edel="${o.id}">Удалить</button>`:o.mode==='add'?`<button class="btn sp" data-dadd="1">＋ В дневник</button>`:o.mode==='pick'?`<button class="btn sp" data-dpick="1">Выбрать</button>`:''}</div>`,isE?1:2) }
 function openEntry(e){ openDetail({mode:'entry',id:e.id,name:e.name,g:e.g,meal:e.meal,f100:{k:e.k100,p:e.p100,f:e.f100,c:e.c100},m100:e.m100,note:e.note}) }
 function openEntryOld(e){ sheet(`<div class="sh"><h2>${esc(e.name)}</h2><button class="x" data-close="1">✕</button></div><div class="g2"><div><label>Граммы</label><input id="eg" type="number" inputmode="numeric" value="${R(e.g)}"></div><div><label>Приём пищи</label><select id="em">${MEALS.map(m=>`<option ${e.meal===m?'selected':''}>${m}</option>`).join('')}</select></div></div>
@@ -357,7 +373,7 @@ document.addEventListener('click',e=>{ const mr=e.target.closest('[data-mic]'); 
   if(d.vsave){saveVoice();return}
   if(d.pinfo!=null){ const f=PR[+d.pinfo]; openDetail({mode:'pick',name:f.n,g:f.pc&&f.pc<=250?f.pc:(f.po||100),f100:f,m100:f.m,food:f}); return }
   if(d.dpick){ const f=DT.food; closeSheet(2); pickFood(f); return }
-  if(d.recinfo){ const r=S.recipes.find(x=>x.id===d.recinfo), n=recipeNut(r); openDetail({mode:'add',name:r.name,g:R(r.yield/Math.max(1,r.servings)),meal:KP.defaultMeal(),f100:n,m100:n.m,food:Object.assign({},n,{n:r.name,src:'recipe'})}); return }
+  if(d.recinfo){ const r=S.recipes.find(x=>x.id===d.recinfo), n=recipeNut(r); openDetail({mode:'add',name:r.name,g:R(n.y/Math.max(1,r.servings)),meal:KP.defaultMeal(),f100:n,m100:n.m,food:Object.assign({},n,{n:r.name,src:'recipe'})}); return }
   if(d.dadd){ const g=+$('#dg').value||DT.g; addEntry(DT.food,g,$('#dm').value); closeSheet(2); cur=dk(); tab='diary'; render(); toast(`${DT.name}: ${R(g)} г`); return }
   if(d.pf!=null){ pickFood(PR[+d.pf]); return } if(d.off){offSearch();return} if(d.scan){scan();return} if(d.scanstop){scanStop&&scanStop();showRes();return} if(d.custom){customForm();return}
   if(d.csave){ const f={n:$('#cn').value.trim(),k:+$('#ck').value||0,p:+$('#cp').value||0,f:+$('#cf').value||0,c:+$('#cc').value||0,po:+$('#cpo').value||100,src:'custom'}; if(!f.n)return toast('Введите название'); S.custom.push(f); save(); dirty(); pickFood(f); return }
@@ -366,12 +382,14 @@ document.addEventListener('click',e=>{ const mr=e.target.closest('[data-mic]'); 
   if(d.edel){ S.days[cur]=day(cur).filter(x=>x.id!==d.edel); save(); closeSheet(); render(); toast('Удалено'); return }
   if(d.ecopy){ const en=day(cur).find(x=>x.id===d.ecopy); const k=dk(); (S.days[k]=day(k).slice()).push(Object.assign({},en,{id:uid()})); save(); closeSheet(); render(); toast('Добавлено на сегодня'); return }
   if(d.water){ S.water[cur]=Math.max(0,(S.water[cur]||0)+ +d.water); save(); render(); return }
+  if(d.sources){ e.preventDefault&&e.preventDefault(); openSources(); return }
+  if(d.ryreset){ syncRecipe(); RE.yw=false; RE.yield=0; openRecipe(); return }
   if(d.newrec){ RE=null; openRecipe(); if(d.newrec==='voice')setTimeout(()=>{syncRecipe();openVoice(null,'recipe')},50); return }
   if(d.editrec){ RE=null; openRecipe(S.recipes.find(r=>r.id===d.editrec)); return }
-  if(d.userec){ const r=S.recipes.find(x=>x.id===d.userec), n=recipeNut(r), sv=R(r.yield/Math.max(1,r.servings)); addEntry(Object.assign({},n,{n:r.name,src:'recipe'}),sv,KP.defaultMeal()); cur=dk(); tab='diary'; render(); toast(`${r.name}: порция ${sv} г`); return }
+  if(d.userec){ const r=S.recipes.find(x=>x.id===d.userec), n=recipeNut(r), sv=R(n.y/Math.max(1,r.servings)); addEntry(Object.assign({},n,{n:r.name,src:'recipe'}),sv,KP.defaultMeal()); cur=dk(); tab='diary'; render(); toast(`${r.name}: порция ${sv} г`); return }
   if(d.radd){ syncRecipe(); openPicker('',f=>{RE.ings.push({n:f.n,g:f.po||100,k:f.k,p:f.p,f:f.f,c:f.c,m:f.m||microOf(f.n)||undefined}); openRecipe()}); return }
   if(d.rvoice){ syncRecipe(); openVoice(null,'recipe'); return } if(d.rdel){ syncRecipe(); RE.ings.splice(+d.rdel,1); openRecipe(); return }
-  if(d.rsave){ syncRecipe(); if(!RE.name)return toast('Назови рецепт'); if(!RE.ings.length)return toast('Добавь ингредиенты'); if(!RE.yield)RE.yield=RE.ings.reduce((a,i)=>a+i.g,0); delete RE._new;
+  if(d.rsave){ syncRecipe(); if(!RE.name)return toast('Назови рецепт'); if(!RE.ings.length)return toast('Добавь ингредиенты'); if(!RE.yw){RE.yield=recipeNut(RE).cooked;RE.yw=false} delete RE._new;
     const i=S.recipes.findIndex(r=>r.id===RE.id); if(i>=0)S.recipes[i]=RE; else S.recipes.push(RE); save(); dirty(); RE=null; closeSheet(); tab='recipes'; render(); toast('Рецепт сохранён'); return }
   if(d.rremove){ if(!confirm('Удалить рецепт?'))return; S.recipes=S.recipes.filter(r=>r.id!==RE.id); save(); dirty(); RE=null; closeSheet(); render(); return }
   if(d.savegoals){ ['k','p','f','c','w'].forEach(k=>S.goals[k]=R(+$('#g'+k).value||S.goals[k])); save(); toast('Цели сохранены'); render(); return }
@@ -391,7 +409,7 @@ document.addEventListener('input',e=>{ const t=e.target,d=t.dataset;
   if(t.id==='smicdbg'){S.set.micdbg=t.checked;save();const el=$('#micdbg');if(el){el.style.display=t.checked?'block':'none';el.textContent=t.checked?'🎙 отладка включена — нажми микрофон':''}return}
 });
 document.addEventListener('toggle',e=>{ const t=e.target; if(!t.classList)return; if(t.classList.contains('nutri')){S.set.nutriOpen=t.open;save()} else if(t.dataset&&t.dataset.k){S.set[t.dataset.k]=t.open;save()} },true);
-document.addEventListener('change',e=>{ const t=e.target,d=t.dataset; if(tab==='menu'&&menuChange(t))return; if(d.imeal!=null){V.items[+d.imeal].meal=t.value;return}
+document.addEventListener('change',e=>{ const t=e.target,d=t.dataset; if(t.id==='rm'&&RE){ syncRecipe(); openRecipe(); return } if(tab==='menu'&&menuChange(t))return; if(d.imeal!=null){V.items[+d.imeal].meal=t.value;return}
   if(t.id==='imp'&&t.files[0]){ t.files[0].text().then(x=>{ const j=JSON.parse(x); if(!j.days)throw 0; if(!confirm('Заменить текущие данные импортом?'))return; S=Object.assign(def(),j); save(); dirty(); render(); toast('Импортировано') }).catch(()=>toast('Неверный файл')) } });
 document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&e.target.id==='pq'){e.preventDefault();showRes()} });
 $('#ver').textContent='v'+VER; render();

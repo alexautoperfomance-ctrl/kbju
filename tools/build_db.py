@@ -1,6 +1,8 @@
 # Сборка встроенной базы: значения на 100 г (Скурихин/таблицы хим. состава + USDA FDC, вручную), плюс
 # производные варианты (способы приготовления по коэффициентам потерь воды/жира, жирность молочки).
-import json,re
+import json,re,sys
+sys.path.insert(0,'tools'); import cook
+DCOOK={}
 DER={}
 items={}; order=[]
 def add(name,syn,k,p,f,c,pc=None,por=None,cat='',src='base',base=None):
@@ -16,13 +18,19 @@ ADJ={'m':['отварной','жареный','тушеный','запеченн
 VAR={'m':'вареный','f':'вареная','n':'вареное','p':'вареные'}
 COOK=[(1.3,0,0),(1.25,6,0),(1.2,3,0),(1.3,2,0)]  # множитель (потеря воды), +жир, +углеводы
 VEGC=[(1.0,0,0),(1.0,3,0.5),(1.0,7,1),(1.15,1.5,0)]
+RU={}
+for line in open('tools/ru_ref.txt',encoding='utf8'):
+    if not line.strip() or line[0]=='#': continue
+    a=line.rstrip('\n').split(';'); RU[a[0].replace('ё','е')]=dict(k=float(a[1]),p=float(a[2]),f=float(a[3]),c=float(a[4]),cat=a[5],s=[x for x in a[6].split('/') if x],src=a[7])
 cat='';rows=[]
 for line in open('tools/data_base.txt',encoding='utf8'):
     line=line.strip()
     if not line or line.startswith('#'): continue
     if line.startswith('@'): cat=line[1:]; continue
     a=line.split(';'); n,syn=a[0],a[1].split('/') if a[1] else []
-    k,p,f,c=map(float,a[2:6]); pc=float(a[6]) if a[6] else None; po=float(a[7]) if a[7] else None; g=a[8]
+    k,p,f,c=map(float,a[2:6])
+    if n.replace('ё','е') in RU: r=RU[n.replace('ё','е')]; k,p,f,c=r['k'],r['p'],r['f'],r['c']
+    pc=float(a[6]) if a[6] else None; po=float(a[7]) if a[7] else None; g=a[8]
     add(n,syn,k,p,f,c,pc,po,cat); items[n.replace('ё','е')]['pl']=1 if g=='p' else 0; rows.append((n,syn,k,p,f,c,pc,po,g,cat))
 EX=json.load(open('tools/extra_resolved.json',encoding='utf8'))
 for x in EX:
@@ -47,14 +55,15 @@ for n,(pc,rf) in RF.items():
 for (n,syn,k,p,f,c,pc,po,g,cat) in rows:
     if n in items and items[n].get('pc'): pc=items[n]['pc']
     if cat in('meat','fish','veg') and n not in('свиное сало','бекон','креветки','мидии','кальмар','лук зеленый','укроп','петрушка','кинза','салат листовой','авокадо','оливки','огурцы соленые','капуста квашеная','томаты консервированные','имбирь','чеснок','шпинат','лимон'):
-        tab=COOK if cat!='veg' else VEGC
-        for i,(m,df,dc) in enumerate(tab):
+        # способы приготовления по выходу USDA [Y]/[YF], вытапливанию жира и впитыванию масла (tools/cook.py)
+        for i,meth in enumerate(['boil','fry','stew','bake']):
             adj=ADJ[g][i]; syns=[adj+' '+n]+[s+' '+adj for s in syn[:3]]
             if i==0: syns+= [n+' '+VAR[g],VAR[g]+' '+n]
-            add(n+' '+adj,syns,None,p*m,f*m+df,c*m+dc,pc,po,cat,'derived',n)
-        g2={'m':'на гриле','f':'на гриле','n':'на гриле','p':'на гриле'}
-        add(n+' на гриле',[s+' на гриле' for s in syn[:2]]+[n+' гриль'],None,p*1.3,f*1.3,c*1.3,pc,po,cat,'derived',n)
-        add(n+' на пару',[s+' на пару' for s in syn[:2]],None,p*1.2,f*1.2,c*1.2,pc,po,cat,'derived',n)
+            o,y,oil=cook.cooked100(dict(k=k,p=p,f=f,c=c),cat,n,meth)
+            add(n+' '+adj,syns,o['k'],o['p'],o['f'],o['c'],pc,po,cat,'derived',n); DCOOK[n+' '+adj]=dict(b=n,m=meth,y=y,oil=oil)
+        for suf,meth in ((' на гриле','grill'),(' на пару','steam')):
+            o,y,oil=cook.cooked100(dict(k=k,p=p,f=f,c=c),cat,n,meth)
+            add(n+suf,[s+suf for s in syn[:2]]+([n+' гриль'] if meth=='grill' else []),o['k'],o['p'],o['f'],o['c'],pc,po,cat,'derived',n); DCOOK[n+suf]=dict(b=n,m=meth,y=y,oil=oil)
         if cat=='fish': add(n+' копченая' if g=='f' else n+(' копченые' if g=='p' else ' копченый'),[],None,p*1.3,f*1.25,c,pc,po,cat,'derived',n)
         if cat=='fish': add(n+(' соленая' if g=='f' else ' соленый'),[],None,p*1.1,f*1.05,0,pc,po,cat,'derived',n)
         if cat=='meat' and n in('говядина','свинина','баранина','курица','индейка','кролик','утка'):
@@ -63,7 +72,7 @@ for (n,syn,k,p,f,c,pc,po,g,cat) in rows:
         add('сок '+n,['свежевыжатый '+n,'фреш '+n],k*0.95,p*0.5,f*0.2,c*1.0,None,200,'drink','derived',n)
         add('компот из '+n,[],k*0.55+15,0.2,0,(k*0.55+15)/4,None,250,'drink','derived',n)
         add('варенье из '+n,['джем '+n],270,0.4,0.2,67,None,20,'sweet','derived',n)
-        add(n+' сушеный',['сушеный '+n,'сухофрукты '+n],k*4.2,p*4,f*3,c*4.2,None,30,'nut','derived',n)
+        if c*4.2<=85 and k<=110: add(n+' сушеный',['сушеный '+n,'сухофрукты '+n],k*4.2,p*4,f*3,c*4.2,None,30,'nut','derived',n)  # сушка ~в 4 раза (USDA dried/raw); для калорийных плодов не строим
         add(n+' замороженный',['замороженная '+n],k,p,f,c,None,100,'fruit','derived',n)
 DAIRY=[('молоко',['молочко'],[0.5,1,1.5,2.5,3.2,3.5,4,6],3.0,4.7,250),
  ('кефир',['кефирчик'],[0,1,1.5,2.5,3.2],3.0,4.0,250),('ряженка',[],[1,2.5,4,6],2.9,4.2,250),
@@ -89,6 +98,45 @@ EXTRA=[('протеин сывороточный',['протеин порошо�
  ('крахмал',['крахмал картофельный'],313,0.1,0,78.2,None,10,'grain'),('дрожжи',[],75,12.7,2.7,0,None,10,'grain'),
  ('какао порошок',['какао-порошок'],289,24.3,15,10.2,None,5,'sweet'),('кофе растворимый',['нескафе','растворимый кофе'],2,0.2,0,0.3,None,200,'drink')]
 for n,sy,k,p,f,c,pc,po,ct in EXTRA: add(n,sy,k,p,f,c,pc,po,ct)
+# ---------- блюда по стандартным рецептурам (tools/dishes.txt) ----------
+DISH=[]; miss=set()
+for line in open('tools/dishes.txt',encoding='utf8'):
+    line=line.strip()
+    if not line or line[0] in '#@': continue
+    a=line.split(';'); n,syn,cu,meth,comp,outg,ref,srcc=a[0].replace('ё','е'),[x for x in a[1].split('/') if x],a[2],a[3],a[4],a[5],a[6],a[7]
+    ing=[]
+    for part in re.split(r',(?=[^\d\s])',comp):
+        nm,g=part.rsplit(':',1); nm=nm.strip().replace('ё','е'); g=float(g)
+        if nm!='вода' and nm not in items: miss.add(nm); continue
+        ing.append((nm,g))
+    raw=sum(g for _,g in ing); K=P_=F=C=0; cooked=0; liq=any(re.match(r'вода|молоко|бульон|кефир|сливки|кокосовое молоко',nm) for nm,_ in ing)
+    for nm,g in ing:
+        EV={'soup':.85,'boil':.9,'stew':.6,'bake':.7}
+        if nm=='вода': cooked+=g*EV.get(meth,1); continue
+        it=items[nm]; gr=cook.group(it['cat'],nm); fr=1.0; y=1.0
+        if nm in cook.WATER: y=cook.WATER[nm] if (meth!='soup' and not liq) else 1.0
+        elif liq and re.match(r'молоко|кефир|сливки|бульон|кокосовое молоко',nm) and meth in EV: y=EV[meth]
+        elif 'фарш' in nm and meth in('fry','bake','stew','grill'): y=.82  # СР: потери при тепловой обработке изделий из котлетной массы ~18%
+        elif meth in('fry','bake','grill','stew','steam','boil') and gr in('meat','poultry','fish','veg','egg') and not re.search(r'отварн|вареный|вареная|вареное|соленая|соленые|консерв|копчен|жарен',nm):
+            y=cook.YIELD[gr].get(meth,1.0); fr=cook.FATRET.get(meth,1) if gr in('meat','poultry') else 1
+        elif meth=='bake' and it['cat'] in('grain','bread'): y=.85
+        K+=it['k']*g/100-(it['f']*g/100*(1-fr))*9; P_+=it['p']*g/100; F+=it['f']*g/100*fr; C+=it['c']*g/100; cooked+=g*y
+    if outg: cooked=float(outg)
+    k100,p100,f100,c100=K/cooked*100,P_/cooked*100,F/cooked*100,C/cooked*100
+    rec=dict(n=n,cu=cu,m=meth,ing=ing,raw=raw,cooked=round(cooked),calc=[round(k100),round(p100,1),round(f100,1),round(c100,1)],src=srcc)
+    if ref:
+        rk,rp,rf_,rc=map(float,ref.split('/')); rec['ref']=[rk,rp,rf_,rc]; v=(rk,rp,rf_,rc); rec['ds']='ru-ref'
+    else: v=(k100,p100,f100,c100); rec['ds']='recipe'
+    old=items.get(n)
+    rec['old']=[old['k'],old['p'],old['f'],old['c']] if old else None
+    if old:
+        old.update(k=round(v[0]),p=round(v[1],1),f=round(v[2],1),c=round(v[3],1)); old['s']=list(dict.fromkeys(old['s']+[x.replace('ё','е') for x in syn])); old['cat']=old['cat'] if old['cat'] in('dish','bread','grain','egg') else 'dish'
+    else:
+        add(n,syn,v[0],v[1],v[2],v[3],None,300 if meth=='soup' else 200 if re.search(r'каш|гречк|рис|пшен|перлов|овсян|манка|булгур|киноа|кускус|макарон|чечевиц|нут|фасол|горох',n) else 250 if meth in('boil','stew') else 200,'dish','base')
+    items[n]['ds']=rec['ds']; DISH.append(rec)
+if miss: print('НЕТ ИНГРЕДИЕНТОВ:',sorted(miss))
+json.dump(DISH,open('tools/dishes_built.json','w'),ensure_ascii=False)
+json.dump(DCOOK,open('tools/derived_cook.json','w'),ensure_ascii=False)
 base=[items[n] for n in list(order) if items[n]['src']=='base']
 for x in base:
     n=x['n'];k,p,f,c=x['k'],x['p'],x['f'],x['c']
@@ -106,6 +154,14 @@ for x in base:
         add(n+' с сиропом',[],None,p,f,c+6,None,x.get('po'),'drink','derived',n)
     if x['cat']=='nut' and x.get('pc')==1: add(n+' жареный' if not n.endswith('и') else n+' жареные',['жареный '+n],None,p,f+2,c,None,30,'nut','derived',n); add(n+' соленый' if not n.endswith('и') else n+' соленые',['соленый '+n],None,p,f,c,None,30,'nut','derived',n)
     if x['cat']=='egg' and n in('омлет','яичница'): add(n+' с помидорами',[],None,p*0.8,f*0.8,c+2,None,200,'egg','derived',n); add(n+' с овощами',[],None,p*0.75,f*0.75,c+2.5,None,200,'egg','derived',n); add(n+' на молоке',[],None,p*0.9,f*0.9,c+1.5,None,170,'egg','derived',n)
+for n,r in RU.items():  # российские справочные значения — приоритет (в т.ч. над производными по жирности)
+    if n in items: items[n].update(k=round(r['k']),p=r['p'],f=r['f'],c=r['c']); items[n]['ds']='ru-ref'
+    else: add(n,r['s'],r['k'],r['p'],r['f'],r['c'],None,{'bread':30,'meat':50,'dairy':10}.get(r['cat'],100),r['cat'] or 'more','base'); items[n]['ds']='ru-ref'
+    items[n]['rs']=r['src']
+OFFRU=json.load(open('tools/off_ru.json',encoding='utf8'))
+for x in OFFRU:  # популярные российские упакованные продукты (Open Food Facts, страна: Россия; данные с упаковки)
+    if x['n'] in items: continue
+    add(x['n'],[],x['k'],x['p'],x['f'],x['c'],None,100,x['cat'],'offru'); items[x['n']]['ds']='off-ru'; items[x['n']]['code']=x['code']
 out=[items[n] for n in order]
 for x in out:
     for kk in('pc','po'):
