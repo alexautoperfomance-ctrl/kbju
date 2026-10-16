@@ -1,5 +1,5 @@
 'use strict';
-const VER='1.8.0';
+const VER='1.9.0';
 const $=s=>document.querySelector(s), R=Math.round, esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const MEALS=['завтрак','обед','ужин','перекус'], MI={завтрак:'🍳',обед:'🍲',ужин:'🍽️',перекус:'🍎'};
 const KEY='kbju.v1';
@@ -147,15 +147,16 @@ function mgk(){ return [S.goals.k,S.goals.p,S.goals.f,S.goals.c,(S.prof||{}).sex
 function mopt(){ return S.menu&&S.menu.opt||{meals:5,excl:[],simple:false} }
 function mGen(opt){ const t0=Date.now(), w=MENU.genWeek(mc(),Object.assign({},opt,{seed:opt.seed})); S.menu={opt,gk:mgk(),sel:S.menu&&S.menu.sel||0,week:w.map(d=>({seed:d.seed,meals:d.meals.map(m=>({k:m.k,m:m.m,items:m.items.map(x=>({n:x.n,g:x.g,lo:x.lo,hi:x.hi,typ:x.typ,grp:x.grp,slot:x.slot}))}))}))}; save(); return Date.now()-t0 }
 function mDay(i){ const d=S.menu.week[i]; return MENU.evalDay({meals:JSON.parse(JSON.stringify(d.meals))},mc()) }
-function mStore(i,d){ S.menu.week[i]={seed:d.seed||S.menu.week[i].seed,meals:d.meals.map(m=>({k:m.k,m:m.m,items:m.items.map(x=>({n:x.n,g:x.g,lo:x.lo,hi:x.hi,typ:x.typ,grp:x.grp,slot:x.slot}))}))}; save() }
+function mStore(i,d){ S.menu.week[i]={seed:d.seed||S.menu.week[i].seed,meals:d.meals.map(m=>({k:m.k,m:m.m,items:m.items.map(x=>({n:x.n,g:x.g,lo:x.lo,hi:x.hi,typ:x.typ,grp:x.grp,slot:x.slot,v:x.v,e:x.e}))})),own:d.own}; save() }
 function vMenu(){ if(!S.menu||!S.menu.week)mGen(mopt()); const M=S.menu, i=M.sel||0, d=mDay(i), g=S.goals, o=M.opt;
   const dlt=(a,b,tol)=>{ const e=Math.abs(a-b)/b; return e<=tol?'ok':'bad' };
   let h=`<div class="card mwk">${WD.map((n,j)=>`<button class="${j===i?'on':''}" data-mday="${j}">${n}</button>`).join('')}</div>`;
   if(M.gk!==mgk()) h+=`<div class="card hint">Цели или профиль изменились — <button class="btn sm" data-mweek="1">пересоставить неделю</button></div>`;
+  h+=`<div class="card row"><button class="btn sp" data-mdict="1">🎙️ Надиктовать своё меню</button></div>`+(S.menu.week[i].own?`<div class="card hint">✍️ Свой день (надиктован)</div>`:'');
   h+=`<div class="card"><div class="mtot"><div class="${dlt(d.tot.k,g.k,.03)}"><b>${R(d.tot.k)}</b><span>/ ${R(g.k)} ккал</span></div><div class="cP ${dlt(d.tot.p,g.p,.05)}"><b>${R(d.tot.p)}</b><span>/ ${R(g.p)} Б</span></div><div class="cF ${dlt(d.tot.f,g.f,.05)}"><b>${R(d.tot.f)}</b><span>/ ${R(g.f)} Ж</span></div><div class="cC ${dlt(d.tot.c,g.c,.05)}"><b>${R(d.tot.c)}</b><span>/ ${R(g.c)} У</span></div></div>
    <div class="row" style="margin-top:6px"><button class="btn s sm sp" data-mregen="1">🔄 Другой вариант</button><button class="btn sm sp" data-maddday="1">＋ Весь день в дневник</button></div></div>`;
   h+=`<div class="card">`+d.meals.map((m,mi)=>`<div class="meal"><div class="mh">${MI[m.m]||'🍎'} ${m.m[0].toUpperCase()+m.m.slice(1)} <span class="mu">${R(m.tot.k)} ккал · ${R(m.tot.p)}·${R(m.tot.f)}·${R(m.tot.c)}</span><button class="add" data-madd="${mi}" aria-label="В дневник">＋</button></div>`+
-    m.items.map((x,ii)=>{ const f=fdb(x.n)||{k:0}; return `<div class="it il mi"><span class="n">${esc(x.n)}</span><span class="mu">${R(x.g)}г</span><span class="k">${R(f.k*x.g/100)}</span><button class="sw" data-mswap="${mi}:${ii}" aria-label="Заменить">⇄</button></div>` }).join('')+`</div>`).join('')+`</div>`;
+    m.items.map((x,ii)=>{ const f=fdb(x.n)||{k:0}; return `<div class="it il mi"><span class="n">${esc(x.n)}</span><span class="mu">${R(x.g)}г</span><span class="k">${R(f.k*x.g/100)}</span>${x.v?'':`<button class="sw" data-mswap="${mi}:${ii}" aria-label="Заменить">⇄</button>`}</div>` }).join('')+`</div>`).join('')+`</div>`;
   const nt=MENU.notes(d), ml=d.micro.filter(m=>m.k!=='Na');
   h+=`<details class="card col" data-k="m_micro" ${S.set.m_micro!==false?'open':''}><summary class="row"><h2 class="sp">🧪 Витамины и минералы <span class="mu">${ml.filter(m=>m.t!=='lim'&&m.amt>=m.norm*.995).length}/${ml.filter(m=>m.t!=='lim').length} в норме</span></h2><span class="chev">›</span></summary>
    <div class="dmg">${ml.map(m=>{ const lim=m.t==='lim', st=lim?(m.amt>(m.ul||m.norm)?'over':''):m.ul&&m.amt>m.ul?'over':m.pct<99.5?'low':'', w=Math.min(100,m.pct);
@@ -167,9 +168,54 @@ function vMenu(){ if(!S.menu||!S.menu.week)mGen(mopt()); const M=S.menu, i=M.sel
    <div class="row" style="margin-top:6px"><button class="btn sp" data-mweek="1">🔄 Пересоставить неделю</button></div>
    <div class="mu" style="margin-top:4px">Меню считается под цели (${R(g.k)} ккал, Б/Ж/У) и нормы микроэлементов по полу и возрасту.</div></details>`;
   return h }
-function mAdd(items,meal){ const L=S.days[dk()]=day(dk()).slice(); let k=0;
-  items.forEach(([x,m])=>{ const f=fdb(x.n); if(!f)return; const n=KP.nutr(f,x.g); L.push({id:uid(),meal:m,name:f.n,g:R(x.g),k:n.k,p:n.p,f:n.f,c:n.c,k100:f.k,p100:f.p,f100:f.f,c100:f.c,cat:f.cat||'',src:f.src||'',m100:f.m||undefined}); S.used[f.n]=(S.used[f.n]||0)+1; k+=n.k });
-  save(); dirty(); toast(`В дневник (сегодня): ${items.length} · ${R(k)} ккал`) }
+function mAdd(items,meal,dt){ dt=dt||dk(); const L=S.days[dt]=day(dt).slice(); let k=0;
+  items.forEach(([x,m])=>{ const f=x.e?{n:x.n,k:x.e.k,p:x.e.p,f:x.e.f,c:x.e.c,cat:'',src:'dict',m:x.e.m}:fdb(x.n); if(!f)return; const n=KP.nutr(f,x.g); L.push({id:uid(),meal:m,name:f.n,g:R(x.g),k:n.k,p:n.p,f:n.f,c:n.c,k100:f.k,p100:f.p,f100:f.f,c100:f.c,cat:f.cat||'',src:f.src||'',m100:f.m||undefined}); S.used[f.n]=(S.used[f.n]||0)+1; k+=n.k });
+  save(); dirty(); toast(`В дневник (${dt===dk()?'сегодня':fmtD(dt)}): ${items.length} · ${R(k)} ккал`) }
+// ---------- 🎙️ Диктовка своего меню ----------
+let DX=null;
+function dictOpt(){ return {KP,COOK,index:index(),MK,micro:n=>microOf(n),fdb,meal:KP.defaultMeal()} }
+function openDict(){ sheet(`<div class="sh"><h2>🎙️ Своё меню</h2><button class="x" data-close="1">✕</button></div>
+  <div class="mu">Скажи, что ел по приёмам. Готовил сам — назови сырые ингредиенты и сколько съел: «на обед сварил суп: 500 г курицы, 300 г картошки, морковка, 2 литра воды, съел тарелку 350 г».</div>
+  <textarea id="dt" rows="3" placeholder="на завтрак 60 г овсянки, на обед сварил суп: …">${esc(DX&&DX.text||'')}</textarea>
+  <button class="mic" id="dmic" data-mict="dt" data-mica="dict" aria-label="Микрофон">🎙️</button><div class="mu" style="text-align:center" id="mst">${SR?'Нажми и говори, ещё раз — стоп':'Нажми 🎤 на клавиатуре'}</div>
+  <div class="row"><button class="btn sp" data-dparse="1">Разобрать</button></div><div id="dres"></div>`); if(DX)dictRender() }
+function dictRun(text){ const r=DICT.parse(text,dictOpt()); DX={text,meals:r.meals,unknown:r.unknown}; dictRender() }
+function dictEntries(){ return [].concat(...DX.meals.map(m=>m.items.filter(x=>!x.unk).map(x=>({name:x.n,g:x.g,k:x.k100*x.g/100,p:x.p100*x.g/100,f:x.f100*x.g/100,c:x.c100*x.g/100,m100:x.m100,meal:m.m})))) }
+function dictRender(){ const el=$('#dres'); if(!el||!DX)return; const g=S.goals, L=dictEntries(), t=tot(L);
+  const dlt=(a,b,tol)=>Math.abs(a-b)/b<=tol?'ok':'bad';
+  if(!L.length){ el.innerHTML=`<div class="card hint">Не понял ни одного продукта${DX.unknown.length?': «'+DX.unknown.map(esc).join('», «')+'»':''}. Попробуй «200 г гречки».</div>`; return }
+  let h=`<div class="card"><div class="mtot"><div class="${dlt(t.k,g.k,.03)}"><b>${R(t.k)}</b><span>/ ${R(g.k)} ккал</span></div><div class="cP ${dlt(t.p,g.p,.05)}"><b>${R(t.p)}</b><span>/ ${R(g.p)} Б</span></div><div class="cF ${dlt(t.f,g.f,.05)}"><b>${R(t.f)}</b><span>/ ${R(g.f)} Ж</span></div><div class="cC ${dlt(t.c,g.c,.05)}"><b>${R(t.c)}</b><span>/ ${R(g.c)} У</span></div></div></div>`;
+  h+=`<div class="card dday">`+DX.meals.map((m,mi)=>{ const mt=tot(m.items.filter(x=>!x.unk).map(x=>({k:x.k100*x.g/100,p:x.p100*x.g/100,f:x.f100*x.g/100,c:x.c100*x.g/100})));
+    return `<div class="meal"><div class="mh">${MI[m.m]||'🍎'} ${m.m[0].toUpperCase()+m.m.slice(1)} <span class="mu">${R(mt.k)} ккал · ${R(mt.p)}·${R(mt.f)}·${R(mt.c)}</span><button class="add" data-dmadd="${mi}" aria-label="Приём в дневник">＋</button></div>`+
+    m.items.map((x,ii)=>x.unk?`<div class="it il mi bad"><span class="n">❓ «${esc(x.unk)}» — не найдено</span><button class="sw" data-ddel="${mi}:${ii}">✕</button></div>`:
+     `<div class="it il mi"><span class="n">${esc(x.n)}</span><input class="dg" type="number" inputmode="numeric" data-dg="${mi}:${ii}" value="${R(x.g)}"><span class="mu">г</span><span class="k">${R(x.k100*x.g/100)}</span><button class="sw" data-ddel="${mi}:${ii}" aria-label="Убрать">✕</button></div>`+
+     (x.dish?`<div class="mu dnote">🍲 ${esc((COOK.METH.find(z=>z[0]===x.dish.meth)||[0,x.dish.meth])[1])}: ${x.dish.ings.map(i=>esc(i.n)+' '+i.g).join(', ')} → готового ≈${R(x.dish.cooked)} г${x.dish.oil?' (+'+x.dish.oil+' г масла впиталось)':''} · ${R(x.k100)} ккал/100 г${x.why?' · '+esc(x.why):''} <button class="lnk" data-dsr="${mi}:${ii}">${S.recipes.some(r=>r.name===x.dish.rn)?'✓ рецепт сохранён':'💾 сохранить как рецепт'}</button></div>`:'')).join('')+`</div>` }).join('')+`</div>`;
+  const a=MICROS.analyze([L],S.prof,MK,microLookup), ml=a.list.filter(m=>m.k!=='Na').sort((x,y)=>MK.indexOf(x.k)-MK.indexOf(y.k));
+  h+=`<div class="card"><h2>🧪 Витамины и минералы <span class="mu">${ml.filter(m=>m.t!=='lim'&&m.pct>=99.5).length}/${ml.filter(m=>m.t!=='lim').length} в норме</span></h2><div class="dmg">${ml.map(m=>{ const lim=m.t==='lim', st=lim?(m.amt>(m.ul||m.norm)?'over':''):m.ul&&m.amt>m.ul?'over':m.pct<99.5?'low':'', w=Math.min(100,m.pct);
+     return `<div class="dmr ${st}"><span class="n">${SHORT[m.k]||esc(m.n)}</span><span class="b"><i style="width:${w}%"></i><em>${R(m.pct)}%</em></span><span class="a">${R(m.amt)}/${R(lim?(m.ul||m.norm):m.norm)} ${m.u}</span></div>` }).join('')}</div></div>`;
+  const tl=MICROS.tipList(a.list,self.FOODS,MK,self.MICRO,{kcalLeft:g.k-t.k});
+  if(tl.length)h+=`<div class="card tips"><div class="tph">🧪 Чем закрыть дефициты <span class="mu">· тап — добавить в перекус</span></div>`+tl.map(x=>`<div class="tp"><b>${SHORT[x.k]||esc(x.n)} ${R(x.pct)}%</b> — ${x.foods.map(f=>`<button class="tpf" data-dtip="${esc(f.n)}|${R(f.g)}">${esc(f.n)} ${MICROS.portTxt(f.f,f.g)} <i>+${R(f.cv)}%</i></button>`).join(', ')}</div>`).join('')+`</div>`;
+  h+=`<div class="card"><div class="row"><input type="date" id="ddate" value="${DX.date||dk()}"><button class="btn sp" data-dadd="1">＋ В дневник</button></div>
+   <div class="row" style="margin-top:6px"><select id="dwd">${WD.map((n,j)=>`<option value="${j}" ${j===(S.menu&&S.menu.sel||0)?'selected':''}>${n}</option>`).join('')}</select><button class="btn s sp" data-dsave="1">📅 Сохранить как день меню</button></div></div>`;
+  el.innerHTML=h }
+function dictEdit(t){ if(!DX)return; const d=t.dataset; if(d.dg!=null){ const [mi,ii]=d.dg.split(':').map(Number); DX.meals[mi].items[ii].g=Math.max(0,+t.value||0); dictRender() } }
+function dictItems(ms){ return [].concat(...ms.map(m=>m.items.filter(x=>!x.unk&&x.g>0).map(x=>[{n:x.n,g:x.g,e:{k:x.k100,p:x.p100,f:x.f100,c:x.c100,m:x.m100}},m.m]))) }
+function dictVec(x){ const c=mc(); if(!c.S)c.S=MENU.setup(c); return [x.k100,x.p100,x.f100,x.c100].concat(c.S.NM.map(d=>{ const j=MK.indexOf(d.k); return j<0||!x.m100?0:(+x.m100[j]||0) })).map(v=>v/100) }
+function dictClick(d,t){
+  if(d.mdict){ openDict(); return true }
+  if(!DX&&!d.dparse)return false;
+  if(d.dparse){ const v=$('#dt').value; if(v.trim())dictRun(v); return true }
+  if(d.ddel){ const [mi,ii]=d.ddel.split(':').map(Number); DX.meals[mi].items.splice(ii,1); if(!DX.meals[mi].items.length)DX.meals.splice(mi,1); dictRender(); return true }
+  if(d.dtip){ const [n,gg]=d.dtip.split('|'), f=fdb(n); if(!f)return true; let m=DX.meals.find(z=>z.m==='перекус'); if(!m)DX.meals.push(m={m:'перекус',items:[]}); m.items.push({n:f.n,g:+gg,k100:f.k,p100:f.p,f100:f.f,c100:f.c,m100:microOf(f.n)}); dictRender(); toast(`${f.n} ${gg} г → перекус`); return true }
+  if(d.dsr){ const [mi,ii]=d.dsr.split(':').map(Number), x=DX.meals[mi].items[ii], nm=x.n.replace(/ \(свой\)$/,'').toLowerCase()+' (мой)';
+    if(!S.recipes.some(r=>r.name===nm)){ S.recipes.push({id:uid(),name:nm,syn:[],meth:x.dish.meth,yield:x.dish.cooked,yw:false,servings:1,ings:x.dish.ings.map(i=>{ const f=fdb(i.n)||{}; return {n:i.n,g:i.g,k:f.k||0,p:f.p||0,f:f.f||0,c:f.c||0,cat:f.cat||''} })}); IX=null; save(); dirty(); toast('Рецепт «'+nm+'» сохранён') }
+    x.dish.rn=nm; dictRender(); return true }
+  if(d.dadd||d.dmadd!=null){ const dt=($('#ddate')&&$('#ddate').value)||dk(); DX.date=dt; mAdd(dictItems(d.dadd?DX.meals:[DX.meals[+d.dmadd]]),null,dt); return true }
+  if(d.dsave){ const i=+$('#dwd').value; if(!S.menu||!S.menu.week)mGen(mopt());
+    S.menu.week[i]={seed:S.menu.week[i].seed,own:true,meals:DX.meals.map((m,k)=>({k:m.m+k,m:m.m,items:m.items.filter(x=>!x.unk&&x.g>0).map(x=>({n:x.n,g:x.g,v:dictVec(x),e:{k:x.k100,p:x.p100,f:x.f100,c:x.c100,m:x.m100}}))})).filter(m=>m.items.length)};
+    S.menu.sel=i; save(); closeSheet(); render(); toast(`Сохранено как ${WD[i]} в меню недели`); return true }
+  return false }
+
 function menuClick(d,t){
   if(d.mday!=null){ S.menu.sel=+d.mday; save(); render(); return true }
   if(d.mregen){ const i=S.menu.sel||0, w=S.menu.week.map((_,j)=>mDay(j)); const nd=MENU.regenDay(mc(),S.menu.opt,w,i,(Date.now()>>>0)); mStore(i,nd); render.keep=true; render(); toast('Новый вариант дня'); return true }
@@ -360,12 +406,12 @@ function addEntry(f,g,meal){ const n=KP.nutr(f,g); (S.days[cur]=day(cur).slice()
 document.addEventListener('click',e=>{ const mr=e.target.closest('[data-mic]'); if(mr){openMicro(mr.dataset.mic);return}
   const t=e.target.closest('button,[data-edit],[data-pf],.sheet'); if(!t)return; const d=t.dataset;
   if(t.classList.contains('sheet')){ if(e.target===t)closeSheet(t.id==='sheet2'?2:1); return }
-  if(tab==='menu'&&menuClick(d,t))return;
+  if(dictClick(d,t))return; if(tab==='menu'&&menuClick(d,t))return;
   if(d.tab){tab=d.tab;render();return} if(d.sm){statMode=d.sm;render();return}
   if(t.id==='prev'||t.id==='next'){cur=addD(cur,t.id==='prev'?-1:1);render();return}
   if(t.id==='fab'){openVoice();return} if(d.addm){openVoice(d.addm);return}
   if(d.close){closeSheet();return} if(d.close2){scanStop&&scanStop();closeSheet(2);return}
-  if(d.mict){ const act=d.mica; micStart(d.mict,t,v=>{ if(act==='parse'){ if(v){V.items=[];doParse(v)} } else if(act==='search'){ showRes() } }); return } if(t.id==='vparse'){ const v=$('#vt').value; if(v.trim()){V.items=[];doParse(v)} return }
+  if(d.mict){ const act=d.mica; micStart(d.mict,t,v=>{ if(act==='parse'){ if(v){V.items=[];doParse(v)} } else if(act==='dict'){ if(v)dictRun(v) } else if(act==='search'){ showRes() } }); return } if(t.id==='vparse'){ const v=$('#vt').value; if(v.trim()){V.items=[];doParse(v)} return }
   if(d.idel){V.items.splice(+d.idel,1);renderItems();return}
   if(d.pick){ const i=+d.pick, it=V.items[i]; openPicker(it.food?'':it.text,f=>{it.food=f; it.unsure=false; it.note=''; if(!it.num&&!it.unit)it.g=KP.grams(f,null,null,1); recalc(it); renderItems()},it.alts); return }
   if(d.cand){ const [i,j]=d.cand.split(':').map(Number), it=V.items[i], f=it.cands[j]; it.food=f; it.unsure=false; if(!(it.unit==='g'||(it.num>=20&&!it.unit)))it.g=KP.grams(f,it.num,it.unit?[0,it.unit,1]:null,1)||it.g; it.note=''; recalc(it); renderItems(); return }
@@ -409,7 +455,7 @@ document.addEventListener('input',e=>{ const t=e.target,d=t.dataset;
   if(t.id==='smicdbg'){S.set.micdbg=t.checked;save();const el=$('#micdbg');if(el){el.style.display=t.checked?'block':'none';el.textContent=t.checked?'🎙 отладка включена — нажми микрофон':''}return}
 });
 document.addEventListener('toggle',e=>{ const t=e.target; if(!t.classList)return; if(t.classList.contains('nutri')){S.set.nutriOpen=t.open;save()} else if(t.dataset&&t.dataset.k){S.set[t.dataset.k]=t.open;save()} },true);
-document.addEventListener('change',e=>{ const t=e.target,d=t.dataset; if(t.id==='rm'&&RE){ syncRecipe(); openRecipe(); return } if(tab==='menu'&&menuChange(t))return; if(d.imeal!=null){V.items[+d.imeal].meal=t.value;return}
+document.addEventListener('change',e=>{ const t=e.target,d=t.dataset; if(t.id==='rm'&&RE){ syncRecipe(); openRecipe(); return } if(d.dg!=null||d.dmeal!=null){ dictEdit(t); return } if(tab==='menu'&&menuChange(t))return; if(d.imeal!=null){V.items[+d.imeal].meal=t.value;return}
   if(t.id==='imp'&&t.files[0]){ t.files[0].text().then(x=>{ const j=JSON.parse(x); if(!j.days)throw 0; if(!confirm('Заменить текущие данные импортом?'))return; S=Object.assign(def(),j); save(); dirty(); render(); toast('Импортировано') }).catch(()=>toast('Неверный файл')) } });
 document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&e.target.id==='pq'){e.preventDefault();showRes()} });
 $('#ver').textContent='v'+VER; render();

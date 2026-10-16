@@ -42,7 +42,7 @@ function lossOf(t,goal,NM){ let L=0; const md=[[t[0],goal.k,.02,3],[t[1],goal.p,
     if(d.norm){ const r=a/d.norm; if(r<1.03){const x=1.03-r; L+=(d.w||1)*(12*x*x+(r<1?2+3*x:0))} }
     if(d.ul&&a>d.ul*.95){const x=(a-d.ul*.95)/d.ul; L+=400*x*x+(a>d.ul?50:0)} }
   return L }
-function total(items,V,n){ const t=new Array(n).fill(0); items.forEach(it=>{ const v=V[it.n]; for(let j=0;j<n;j++)t[j]+=v[j]*it.g }); return t }
+function total(items,V,n){ const t=new Array(n).fill(0); items.forEach(it=>{ const v=it.v||V[it.n]; if(!v)return; for(let j=0;j<n;j++)t[j]+=v[j]*it.g }); return t }
 const realism=items=>items.reduce((s,it)=>s+.15*((it.g-it.typ)/Math.max(30,it.typ))**2,0);
 // подбор граммов: покоординатный спуск шагами 40/20/10/5 в границах
 function fitGrams(items,ctx,S,passes){ const n=4+S.NM.length, t=total(items,S.V,n); let L=lossOf(t,ctx.goals,S.NM)+realism(items);
