@@ -57,6 +57,9 @@ details.col>summary{list-style:none;cursor:pointer;min-height:36px}details.col>s
 .mic{width:72px;height:72px;font-size:1.9rem;margin:2px auto}.hint{padding:6px 8px;font-size:.76rem;margin:4px 0}.sheet>div{padding:10px 10px calc(12px + env(safe-area-inset-bottom))}.sh{margin-bottom:4px}
 .pi{padding:6px 8px;margin-bottom:4px}.pi .nm{font-size:.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:30px}.pi .ctl{grid-template-columns:92px 1fr 36px;margin-top:3px;gap:4px}.pi .mu{margin-top:2px!important}.x{width:36px;height:36px}
 .score{font-size:.8rem;padding:2px 7px}.plan{font-size:.8rem}.swap{font-size:.78rem}.res{padding:6px 0}
+.mr{display:grid;grid-template-columns:118px 1fr 74px 38px;gap:6px;align-items:center;min-height:30px;font-size:.8rem;border-top:1px solid #f2f4f3;cursor:pointer}.mr .mn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mr .mb{height:6px;background:#eef1ef;border-radius:4px;overflow:hidden}.mr .mb i{display:block;height:100%;background:var(--g);border-radius:4px}.mr .ma{text-align:right;color:var(--mu);font-size:.74rem;white-space:nowrap}.mr .mp{text-align:right;font-weight:600}
+.mr.low .mb i{background:var(--F)}.mr.low .mp{color:#b45309}.mr.over .mb i{background:var(--red)}.mr.over .mp{color:var(--red)}.cR{background:#fde8e8;color:var(--red)}
 </style></head><body>
 <header><button id="prev" aria-label="Предыдущий день">‹</button><div class="d" id="dlabel"></div><button id="next" aria-label="Следующий день">›</button><button id="say" title="Озвучить">🔊</button><span id="ver"></span></header>
 <main id="app"></main>
@@ -65,5 +68,5 @@ details.col>summary{list-style:none;cursor:pointer;min-height:36px}details.col>s
 <div class="sheet" id="sheet"><div id="sbody"></div></div>
 <div class="sheet" id="sheet2"><div id="sbody2"></div></div>
 <div id="toast"></div>
-<script src="db.js"></script><script src="parser.js"></script><script src="nutri.js"></script><script src="app.js"></script>
+<script src="db.js"></script><script src="micro.js"></script><script src="micros.js"></script><script src="parser.js"></script><script src="nutri.js"></script><script src="app.js"></script>
 </body></html>

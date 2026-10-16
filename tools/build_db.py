@@ -1,11 +1,13 @@
 # Сборка встроенной базы: значения на 100 г (Скурихин/таблицы хим. состава + USDA FDC, вручную), плюс
 # производные варианты (способы приготовления по коэффициентам потерь воды/жира, жирность молочки).
 import json,re
+DER={}
 items={}; order=[]
 def add(name,syn,k,p,f,c,pc=None,por=None,cat='',src='base',base=None):
     name=name.replace('ё','е').strip()
     if src=='derived' and base and base in items and name.startswith(base+' '):
         suf=name[len(base):]; syn=list(syn)+[x+suf for x in items[base]['s'][:4]]
+    if src=='derived' and base: DER[name.replace('ё','е').strip()]=base
     if name in items: return
     if k is None: k=round(4*p+9*f+4*c)
     items[name]=dict(n=name,s=[x.replace('ё','е').strip() for x in syn if x.strip()],k=round(k),p=round(p,1),f=round(f,1),c=round(c,1),pc=pc,po=por,cat=cat,src=src); order.append(name)
@@ -92,4 +94,5 @@ for x in out:
     if not x.get('pl'): x.pop('pl',None)
 js='// Встроенная база КБЖУ на 100 г. Источники: таблицы хим. состава (Скурихин), USDA FoodData Central (public domain), типовые рецептуры блюд. Сгенерировано tools/build_db.py\nself.FOODS='+json.dumps(out,ensure_ascii=False,separators=(',',':'))+';\n'
 open('db.js','w',encoding='utf8').write(js)
+json.dump(DER,open('tools/derived.json','w'),ensure_ascii=False)
 print(len(out),'items',sum(1 for x in out if x['src']=='base'),'base', len(js)//1024,'KB')

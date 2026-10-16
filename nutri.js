@@ -75,16 +75,20 @@ function analyze(o){ const g=o.goals, w=(o.prof&&o.prof.w)||70, keys=o.days.map(
   if(P>=7){ if(m.distinctWeek<15) pen(.6,`Рацион однообразный: ${m.distinctWeek} разных продуктов за неделю (лучше 20–30).`,'добавь за неделю 2 новых овоща, рыбу и бобовые',1); else if(m.distinctWeek>=22) plus(`Разнообразное питание: ${m.distinctWeek} разных продуктов за неделю.`,1);
     if(m.regular<70) pen(.5,`Записи есть только в ${R(m.regular)}% дней — анализ неточный.`,'записывай каждый приём сразу голосом — это 10 секунд',m.regular<50?2.5:1); else plus(`Регулярный дневник: записи в ${R(m.regular)}% дней.`,1) }
   if(m.perDay<2.5) pen(.5,`В среднем всего ${R(m.perDay)} записи в день — возможно, что-то не записано.`,'записывай перекусы и напитки тоже',1);
+  const md=(o.micro||[]).filter(d=>d.st==='low'&&d.k!=='Cr').slice(0,4); m.microDef=md.map(d=>({k:d.k,n:d.n,pct:R(d.pct),t:o.microAdvice?o.microAdvice(d):`${d.n} ${R(d.pct)}% нормы`}));
+  sc-=Math.min(1.5,md.length*.35); const over=(o.micro||[]).filter(d=>d.st==='over'); m.microOver=over.map(d=>({n:d.n,t:`${d.n}: ${R(d.amt)} ${d.u} — выше предела ${d.ul} ${d.u}`+(d.k==='Na'?' (соль, добавленная при готовке, не учтена)':d.k==='Sug'?' — урежь сладкое и сладкие напитки':'')}));
+  if(over.length) sc-=Math.min(1,over.length*.4);
   good.sort((a,b)=>b.w-a.w); bad.sort((a,b)=>b.w-a.w);
   const score=Math.max(1,Math.min(10,R(sc)));
   // ----- план на завтра -----
   const plan=[`Цель: ${g.k} ккал, белок ${g.p} г (${R(g.p*.3)} г на завтрак, ${R(g.p*.35)} на обед, ${R(g.p*.35)} на ужин).`];
   bad.slice(0,3).forEach(b=>{ if(b.swap)plan.push(cap(b.swap)+'.') });
+  m.microDef.slice(0,2).forEach(d=>plan.push(d.t.replace(/^(.*?) \d+% нормы — добавь/,'Для $1: добавь')+'.'));
   if(plan.length<4) plan.push('Овощи в каждый основной приём — минимум 400 г за день.');
   if(m.water!=null&&plan.length<5) plan.push(`Вода — ${g.w} мл.`);
   const label=o.mode==='day'?'за день':o.mode==='week'?'за неделю':'за месяц';
-  const speech=`Разбор ${label}. Оценка ${score} из 10. `+(good[0]?'Хорошо: '+good.slice(0,2).map(x=>x.t).join(' '):'')+(bad[0]?' Главное исправить: '+bad[0].t+' Совет: '+bad[0].swap+'.':'')+' План на завтра: '+plan.slice(1,3).join(' ');
-  return {score,strengths:good.slice(0,3),problems:bad.slice(0,3),plan:plan.slice(0,5),metrics:m,speech,tdee} }
+  const speech=`Разбор ${label}. Оценка ${score} из 10. `+(good[0]?'Хорошо: '+good.slice(0,2).map(x=>x.t).join(' '):'')+(bad[0]?' Главное исправить: '+bad[0].t+' Совет: '+bad[0].swap+'.':'')+(m.microDef.length?' Не хватает: '+m.microDef.slice(0,3).map(d=>d.n+' '+d.pct+' процентов нормы').join(', ')+'. '+m.microDef[0].t.split(' — ')[1]+'.':'')+' План на завтра: '+plan.slice(1,3).join(' ');
+  return {score,strengths:good.slice(0,3),problems:bad.slice(0,3),plan:plan.slice(0,6),metrics:m,speech,tdee} }
 const grams=kg=>kg>=.95?R(kg)+' кг':R(kg*1000/50)*50+' г'; const cap=s=>s[0].toUpperCase()+s.slice(1);
 const N={analyze,fiber100,RX};
 if(typeof module!=='undefined'&&module.exports)module.exports=N; else G.NUTRI=N;
