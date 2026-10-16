@@ -37,4 +37,20 @@ const r=N.analyze({days:[{key:'d',entries:[E('макароны',300),E('соси
 as(r.metrics.microDef.length>=3&&r.metrics.microDef.every(d=>/добавь/.test(d.t)),'нутрициолог: дефициты с советами');
 as(r.plan.some(p=>/^Для .+: добавь/.test(p)),'дефициты в плане на завтра');
 as(![...r.metrics.microDef.map(d=>d.t),...r.plan].some(t=>/\d[.,]\d/.test(t.replace(/\d+%/g,''))),'только целые числа');
+// v1.6 советы по дефицитам
+{ const lk=n=>self.MICRO[n], day=[E('гречка',200),E('куриная грудка',150),E('огурец',100)], a=M.analyze([day],{sex:'m',a:35},K,lk);
+  const tl=M.tipList(a.list,self.FOODS,K,self.MICRO,{kcalLeft:1500}), low=a.list.filter(d=>d.st==='low'&&d.k!=='Na'&&d.t!=='lim');
+  as(tl.length===low.length,'строка на каждый дефицит ('+tl.length+'/'+low.length+')'); as(!tl.some(x=>x.k==='Na'||x.k==='Sug'||x.k==='Chol'),'без натрия и лимитов');
+  as(tl.every((x,i)=>!i||tl[i-1].pct<=x.pct),'сортировка по наибольшему разрыву'); as(tl.every(x=>x.foods.length>=2&&x.foods.length<=3),'2–3 продукта');
+  const all=new Set(Object.values(M.TIP).join('|').split('|')); as(tl.every(x=>x.foods.every(f=>M.TIP[x.k].split('|').includes(f.n))),'только из списка нутриента');
+  as(![...all].some(n=>/карп|сазан|печень трески|кровян/.test(n)),'нет странных продуктов'); as([...all].every(n=>F(n)&&self.MICRO[n]),'все продукты списка есть в базе');
+  const D=tl.find(x=>x.k==='D'); as(D&&/скумбрия|сельдь|горбуша|лосось|форель|яйцо/.test(D.foods[0].n),'вит. D → рыба/яйца: '+(D&&D.foods.map(f=>f.n)));
+  as(D.foods.every(f=>f.cv>=4&&f.g>=10&&f.g<=250),'реалистичные порции');
+  as(tl.some(x=>x.foods.some(f=>f.also.length>=2)),'есть продукт, закрывающий несколько дефицитов');
+  const tight=M.tipList(a.list,self.FOODS,K,self.MICRO,{kcalLeft:0}), kc=x=>x.foods.reduce((s,f)=>s+f.kc,0)/x.foods.length;
+  as(tight.reduce((s,x)=>s+kc(x),0)<=tl.reduce((s,x)=>s+kc(x),0),'без запаса калорий — продукты легче');
+  as(M.portTxt(F('яйцо'),100)==='2 шт'&&M.portTxt(F('скумбрия'),100)==='100 г','формат порций');
+  const full=[...day,E('скумбрия',300),E('творог 5%',400),E('шпинат',200),E('чечевица',300),E('морковь',200),E('апельсин',300),E('куриная печень',100),E('тыквенные семечки',60),E('морская капуста',150),E('брокколи',300)];
+  const b=M.analyze([full],{sex:'m',a:35},K,lk), tb=M.tipList(b.list,self.FOODS,K,self.MICRO,{});
+  as(tb.length<tl.length&&!tb.some(x=>x.k==='D'),'после еды дефицитов меньше ('+tl.length+'→'+tb.length+')'); }
 console.log(`\n${ok} passed, ${bad} failed`); process.exit(bad?1:0);

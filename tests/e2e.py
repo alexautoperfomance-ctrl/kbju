@@ -23,7 +23,7 @@ async def main():
     await c.add_init_script(FAKE); pg=await c.new_page()
     pg.on('console',lambda m: m.type=='error' and errs.append(m.text)); pg.on('pageerror',lambda e: errs.append(str(e)))
     await pg.goto(URL); await pg.wait_for_selector('#nav button')
-    assert 'v1.5.0' in await pg.inner_text('#ver')
+    assert 'v1.6.0' in await pg.inner_text('#ver')
     assert await pg.locator('text=🔊').count()==0, 'нет кнопок озвучки'
     # --- микрофон-переключатель: 3 сессии (iOS-рестарты) до нажатия «стоп»
     await pg.evaluate("window.__chunks=['на завтрак два яйца','и кофе с молоком','на обед 200 грамм гречки и куриная грудка']")
@@ -110,6 +110,16 @@ async def main():
     txt=await pg.inner_text('#app'); print('fractions',[txt[max(0,m.start()-40):m.end()+5] for m in re.finditer(r'\d[.,]\d',txt.replace('2,5','').replace('3,2',''))][:3])
     await pg.click('[data-tab="more"]'); assert 'Озвуч' not in await pg.inner_text('#app'); await pg.screenshot(path='shots/settings.png')
     assert await pg.evaluate('window.__tts')==0, 'TTS не вызывался'
+    await pg.click('[data-tab="diary"]'); await pg.wait_for_timeout(200)
+    if not await pg.evaluate("document.querySelector('details[data-k=adv_day]').open"): await pg.click('details[data-k="adv_day"] summary h2')
+    n1=await pg.locator('.tp').count(); assert n1>=1, 'нет советов по микро'
+    lines=await pg.eval_on_selector_all('.tp','e=>e.map(x=>x.innerText)'); print('tips',n1,lines[:3])
+    assert not any('Натрий' in l for l in lines) and all(l.count('%')>=3 for l in lines) and not re.search(r'\d[.,]\d',' '.join(lines))
+    await pg.evaluate("document.querySelector('.tips').scrollIntoView();window.scrollBy(0,-60)"); await pg.wait_for_timeout(300); await pg.screenshot(path='shots/tips-micros.png')
+    k0=await pg.get_attribute('.tp >> nth=0','data-tk'); p0=await pg.inner_text('.tp >> nth=0 >> b'); fn=(await pg.get_attribute('.tp >> nth=0 >> .tpf >> nth=0','data-tipadd')).split('|')[0]
+    await pg.click('.tp >> nth=0 >> .tpf >> nth=0'); await pg.wait_for_selector('.pi'); assert fn in await pg.inner_text('#vres'); await pg.click('[data-vsave]'); await pg.wait_for_timeout(700)
+    p1=await pg.inner_text(f'.tp[data-tk="{k0}"] b') if await pg.locator(f'.tp[data-tk="{k0}"]').count() else 'закрыт'
+    print('live tip',fn,p0,'→',p1); assert p1!=p0
     await pg.click('[data-tab="diary"]'); await pg.click('[data-addm="перекус"]'); await pg.wait_for_selector('#vt'); await pg.fill('#vt','3 маракуйи, кралик 200 г'); await pg.click('#vparse'); await pg.wait_for_selector('.pi >> nth=1')
     nt=await pg.inner_text('#vres'); print('confirm:',nt.replace(chr(10),' | ')[:240]); assert '3 шт ≈ 54 г мякоти' in nt and await pg.locator('.cands').count()>=1
     await pg.screenshot(path='shots/confirm-fuzzy.png'); await pg.click('[data-cand="1:0"]'); assert await pg.locator('.cands').count()==0

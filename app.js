@@ -1,5 +1,5 @@
 'use strict';
-const VER='1.5.0';
+const VER='1.6.0';
 const $=s=>document.querySelector(s), R=Math.round, esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const MEALS=['завтрак','обед','ужин','перекус'], MI={завтрак:'🍳',обед:'🍲',ужин:'🍽️',перекус:'🍎'};
 const KEY='kbju.v1';
@@ -75,7 +75,14 @@ function bar(name,v,g,col){ return `<div class="bar"><div class="t"><span>${name
 function summary(t,g,mul){ mul=mul||1; const left=R(g.k*mul-t.k);
   return `<div class="sum">${ring(t.k,g.k*mul,92,'var(--K)',R(t.k),left>=0?'осталось '+left:'перебор '+(-left))}<div class="bars">${bar('Белки',t.p,g.p*mul,'var(--P)')}${bar('Жиры',t.f,g.f*mul,'var(--F)')}${bar('Углеводы',t.c,g.c*mul,'var(--C)')}<div class="mu">цель ${R(g.k*mul)} ккал</div></div></div>` }
 const chips=e=>`<span class="chip cP">Б ${R(e.p)}</span><span class="chip cF">Ж ${R(e.f)}</span><span class="chip cC">У ${R(e.c)}</span>`;
-function advHtml(list,sayId){ const k='adv_'+sayId; return `<details class="card col" data-k="${k}" ${S.set[k]?'open':''}><summary class="row"><h2 class="sp">💡 Советы <span class="mu">${list.length}</span></h2><span class="chev">›</span></summary>${list.map(([i,t])=>`<div class="adv"><span>${i}</span><span>${esc(t)}</span></div>`).join('')}</details>` }
+function advHtml(list,sayId,extra,n2){ const k='adv_'+sayId; return `<details class="card col" data-k="${k}" ${S.set[k]?'open':''}><summary class="row"><h2 class="sp">💡 Советы <span class="mu">${list.length+(n2||0)}</span></h2><span class="chev">›</span></summary>${list.map(([i,t])=>`<div class="adv"><span>${i}</span><span>${esc(t)}</span></div>`).join('')}${extra||''}</details>` }
+// дефициты дня → 2–3 продукта с порцией и % нормы; тап — в экран подтверждения
+function tipsHtml(L,g){ const a=lastAdv.micro; if(!a||!L.length)return ''; const t=tot(L);
+  const tl=MICROS.tipList(a.list,self.FOODS,MK,self.MICRO,{kcalLeft:g.k-t.k}); lastAdv.tips=tl; if(!tl.length)return '';
+  const cnt={}; tl.forEach(x=>x.foods.forEach(f=>{ if(f.also.length) cnt[f.n]=Math.max(cnt[f.n]||0,f.also.filter(k=>tl.some(y=>y.k===k)).length+1) }));
+  const best=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];
+  return `<div class="tips"><div class="tph">🧪 Добрать витамины и минералы <span class="mu">· тап — добавить</span></div>${best&&best[1]>=3?`<div class="tpb">⭐ ${esc(best[0])} закрывает сразу ${best[1]} ${best[1]%10>=2&&best[1]%10<=4&&(best[1]%100<12||best[1]%100>14)?'дефицита':'дефицитов'}</div>`:''}`+
+   tl.map(x=>`<div class="tp" data-tk="${x.k}"><b>${SHORT[x.k]||esc(x.n)} ${R(x.pct)}%</b> — ${x.foods.map(f=>`<button class="tpf" data-tipadd="${esc(f.n)}|${R(f.g)}">${best&&best[1]>=3&&f.n===best[0]?'⭐':''}${esc(f.n)} ${MICROS.portTxt(f.f,f.g)} <i>+${R(f.cv)}%</i></button>`).join(', ')}</div>`).join('')+`</div>` }
 let lastAdv={};
 function render(){ $('#dlabel').textContent=tab==='diary'||(tab==='stats'&&statMode==='day')?fmtD(cur):({stats:'Статистика',recipes:'Рецепты',goals:'Цели',more:'Ещё'})[tab];
   $('#prev').style.visibility=$('#next').style.visibility=(tab==='diary'||tab==='stats')?'visible':'hidden';
@@ -87,7 +94,7 @@ function vDiary(){ const L=day(cur), t=tot(L), g=S.goals, w=S.water[cur]||0; con
     return `<div class="meal"><div class="mh">${MI[m]} ${m[0].toUpperCase()+m.slice(1)} <span class="mu">${es.length?R(mt.k)+' ккал':''}</span><button class="add" data-addm="${m}">＋</button></div>`+
      es.map(e=>`<div class="it il" data-edit="${e.id}"><span class="n">${esc(e.name)}</span><span class="mu">${R(e.g)}г</span><span class="mac">${R(e.p)}·${R(e.f)}·${R(e.c)}</span><span class="k">${R(e.k)}</span></div>`).join('')+`</div>` }).join('')+`</div>`;
   if(S.set.water) h+=`<div class="card row wrow"><b>💧 ${w}<span class="mu"> / ${g.w} мл</span></b><div class="wt sp">${Array.from({length:Math.ceil(g.w/250)},(_,i)=>`<i class="${i<w/250?'f':''}"></i>`).join('')}</div><button class="btn s sm" data-water="-250">−</button><button class="btn sm" data-water="250">＋250</button></div>`;
-  return h+advHtml(adv,'day') }
+  const th=tipsHtml(L,g); return h+advHtml(adv,'day',th,lastAdv.tips?lastAdv.tips.length:0) }
 const SHORT={A:'Вит. A',D:'Вит. D',E:'Вит. E',K:'Вит. K',C:'Вит. C',B1:'B1',B2:'B2',B3:'B3 (PP)',B5:'B5',B6:'B6',B7:'B7 биотин',B9:'B9 фолаты',B12:'B12',Ch:'Холин',Ca:'Кальций',P:'Фосфор',Mg:'Магний',K_:'Калий',Na:'Натрий',Fe:'Железо',Zn:'Цинк',Cu:'Медь',Mn:'Марганец',Se:'Селен',I:'Йод',Cr:'Хром',Fib:'Клетчатка',O3:'Омега-3',Sug:'Сахара',Chol:'Холестерин'};
 let microPrev={};
 function diaryMicro(L){ const a=MICROS.analyze([L],S.prof,MK,microLookup); lastAdv.micro=a; const low=a.list.filter(d=>d.st==='low').length, over=a.list.filter(d=>d.st==='over').length, ok=a.list.length-low-over;
@@ -278,6 +285,7 @@ document.addEventListener('click',e=>{ const mr=e.target.closest('[data-mic]'); 
   if(d.idel){V.items.splice(+d.idel,1);renderItems();return}
   if(d.pick){ const i=+d.pick, it=V.items[i]; openPicker(it.food?'':it.text,f=>{it.food=f; it.unsure=false; it.note=''; if(!it.num&&!it.unit)it.g=KP.grams(f,null,null,1); recalc(it); renderItems()},it.alts); return }
   if(d.cand){ const [i,j]=d.cand.split(':').map(Number), it=V.items[i], f=it.cands[j]; it.food=f; it.unsure=false; if(!(it.unit==='g'||(it.num>=20&&!it.unit)))it.g=KP.grams(f,it.num,it.unit?[0,it.unit,1]:null,1)||it.g; it.note=''; recalc(it); renderItems(); return }
+  if(d.tipadd){ const [n,gg]=d.tipadd.split('|'), f=fdb(n); if(!f)return; openVoice(cur===dk()?KP.defaultMeal():'перекус'); const it={meal:V.meal||KP.defaultMeal(),text:n,raw:'совет',g:+gg,num:+gg,unit:'g',food:f,alts:[],cands:[]}; recalc(it); V.items=[it]; renderItems(); return }
   if(d.vsave){saveVoice();return}
   if(d.pinfo!=null){ const f=PR[+d.pinfo]; openDetail({mode:'pick',name:f.n,g:f.pc&&f.pc<=250?f.pc:(f.po||100),f100:f,m100:f.m,food:f}); return }
   if(d.dpick){ const f=DT.food; closeSheet(2); pickFood(f); return }
