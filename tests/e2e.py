@@ -23,7 +23,7 @@ async def main():
     await c.add_init_script(FAKE); pg=await c.new_page()
     pg.on('console',lambda m: m.type=='error' and errs.append(m.text)); pg.on('pageerror',lambda e: errs.append(str(e)))
     await pg.goto(URL); await pg.wait_for_selector('#nav button')
-    assert 'v1.4.0' in await pg.inner_text('#ver')
+    assert 'v1.5.0' in await pg.inner_text('#ver')
     assert await pg.locator('text=🔊').count()==0, 'нет кнопок озвучки'
     # --- микрофон-переключатель: 3 сессии (iOS-рестарты) до нажатия «стоп»
     await pg.evaluate("window.__chunks=['на завтрак два яйца','и кофе с молоком','на обед 200 грамм гречки и куриная грудка']")
@@ -49,6 +49,23 @@ async def main():
     await pg.click('[data-vsave]'); await pg.wait_for_timeout(300)
     await pg.click('[data-water="250"]'); await pg.click('[data-water="250"]')
     await pg.screenshot(path='shots/diary-compact.png'); await pg.screenshot(path='shots/diary.png')
+    assert not await pg.evaluate("document.querySelector('details[data-k=d_micro]').open"), 'свёрнуто по умолчанию'
+    vis=await pg.evaluate("(()=>{const m=[...document.querySelectorAll('.meal')];return [m[m.length-1].getBoundingClientRect().bottom,innerHeight]})()"); print('collapsed: last meal bottom',vis); assert vis[0]<800
+    print('micro summary:',await pg.inner_text('#dmsum'))
+    await pg.click('details[data-k=d_micro] summary h2'); await pg.wait_for_timeout(800)
+    assert await pg.locator('.dmr').count()==30
+    val=lambda k: pg.evaluate(f"(()=>{{const r=document.querySelector('.dmr[data-mic={k}]');return [parseInt(r.querySelector('.a').textContent),parseInt(r.querySelector('em').textContent),r.querySelector('i').style.width]}})()")
+    ca0,b20,d0=await val('Ca'),await val('B2'),await val('D'); print('before milk Ca/B2/D',ca0,b20,d0)
+    await pg.click('[data-addm="перекус"]'); await pg.wait_for_selector('#vt'); await pg.fill('#vt','два стакана молока 3,2%'); await pg.click('#vparse'); await pg.wait_for_selector('.pi'); await pg.click('[data-vsave]'); await pg.wait_for_timeout(900)
+    ca1,b21,d1=await val('Ca'),await val('B2'),await val('D'); print('after milk Ca/B2/D',ca1,b21,d1)
+    mca=await pg.evaluate("self.MICRO['молоко 3,2%'][self.MK.indexOf('Ca')]*5")
+    assert abs((ca1[0]-ca0[0])-mca)<=2 and b21[0]>b20[0] and d1[0]>=d0[0] and ca1[2]!=ca0[2], 'живое обновление'
+    assert await pg.evaluate("document.querySelector('details[data-k=d_micro]').open"), 'состояние запомнено'
+    await pg.evaluate('window.scrollTo(0,0)'); await pg.wait_for_timeout(300); await pg.screenshot(path='shots/diary-micros.png')
+    await pg.click('.dmr[data-mic="Ca"]'); await pg.wait_for_selector('#sheet2.on'); assert 'Кальций' in await pg.inner_text('#sbody2'); await pg.click('[data-close2]')
+    # удаление молока — значения падают
+    await pg.click('.it:has-text("молоко 3,2%")'); await pg.click('[data-edel]'); await pg.wait_for_timeout(700); ca2=await val('Ca'); print('after delete Ca',ca2); assert ca2[0]==ca0[0]
+    await pg.click('details[data-k=d_micro] summary h2')
     # --- детали записи
     await pg.click('.it:has-text("маракуйя")'); await pg.wait_for_selector('#dbody .dgrid')
     dt=await pg.inner_text('#sbody'); print('detail:',dt[:300].replace('\n',' | '))
@@ -93,6 +110,10 @@ async def main():
     txt=await pg.inner_text('#app'); print('fractions',[txt[max(0,m.start()-40):m.end()+5] for m in re.finditer(r'\d[.,]\d',txt.replace('2,5','').replace('3,2',''))][:3])
     await pg.click('[data-tab="more"]'); assert 'Озвуч' not in await pg.inner_text('#app'); await pg.screenshot(path='shots/settings.png')
     assert await pg.evaluate('window.__tts')==0, 'TTS не вызывался'
+    await pg.click('[data-tab="diary"]'); await pg.click('[data-addm="перекус"]'); await pg.wait_for_selector('#vt'); await pg.fill('#vt','3 маракуйи, кралик 200 г'); await pg.click('#vparse'); await pg.wait_for_selector('.pi >> nth=1')
+    nt=await pg.inner_text('#vres'); print('confirm:',nt.replace(chr(10),' | ')[:240]); assert '3 шт ≈ 54 г мякоти' in nt and await pg.locator('.cands').count()>=1
+    await pg.screenshot(path='shots/confirm-fuzzy.png'); await pg.click('[data-cand="1:0"]'); assert await pg.locator('.cands').count()==0
+    await pg.click('[data-vsave]'); await pg.wait_for_timeout(500); await pg.click('[data-edit]:has-text("маракуйя") >> nth=-1'); await pg.wait_for_selector('#dnote'); assert '54 г мякоти' in await pg.inner_text('#dnote'); await pg.screenshot(path='shots/detail-edible.png')
     print('sw',await pg.evaluate("navigator.serviceWorker.getRegistration().then(r=>!!r)"))
     await b.close()
   net=[e for e in errs if 'openfoodfacts' in e or 'ERR_FAILED' in e]; app=[e for e in errs if e not in net]

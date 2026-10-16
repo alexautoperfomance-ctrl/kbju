@@ -7,7 +7,10 @@ K=[('A',['1106'],1),('D',['1114'],1),('E',['1109'],1),('K',['1185'],1),('C',['11
  ('B7',[],1),('B9',['1190'],1),('B12',['1178'],1),('Ch',['1180'],1),('Ca',['1087'],1),('P',['1091'],1),('Mg',['1090'],1),('K_',['1092'],1),('Na',['1093'],1),('Fe',['1089'],1),('Zn',['1095'],1),
  ('Cu',['1098'],1000),('Mn',['1101'],1000),('Se',['1103'],1),('I',[],1),('Cr',[],1),('Fib',['1079'],1),('Sug',['2000'],1),('Chol',['1253'],1),('O3',['1404','1278','1272','1280'],1000)]
 KEYS=[k for k,_,_ in K]; IDX={k:i for i,k in enumerate(KEYS)}
-ids=json.load(open('tools/usda_ids.json')); need=set(ids.values())
+ids=json.load(open('tools/usda_ids.json')); EXR=json.load(open('tools/extra_resolved.json',encoding='utf8'))
+for x in EXR:
+    if 'id' in x: ids[x['n']]=x['id']
+need=set(ids.values())
 nut={}; kcal={}
 for r in csv.DictReader(open(D+'food_nutrient.csv')):
     f=r['fdc_id']
@@ -48,6 +51,10 @@ for f in FOODS:
         s=1 if uk<15 or f['k']<15 else max(.15,min(3,f['k']/uk))
         v=[(x or 0)*s if x is not None else None for x in v]
         U[f['n']]=v; S[f['n']]='u'
+for x in EXR:
+    if 'analog' in x and x['analog'] in U:
+        a=BY[x['analog']]; sc=x['k']/max(1,a['k']); U[x['n']]=[(v or 0)*sc for v in U[x['analog']]]; S[x['n']]='e'
+        U[x['n']][IDX['Sug']]=U[x['analog']][IDX['Sug']]*sc
 # состав блюд (г на 100 г блюда) из продуктов с данными USDA
 COMP=[(r'борщ','свекла:14,капуста белокочанная:12,картофель:12,морковь:5,говядина:6,помидор:4,лук репчатый:3'),(r'^щи','капуста белокочанная:25,картофель:10,морковь:4,говядина:5'),
  (r'солянк','говядина:8,колбаса копченая:5,огурцы соленые:6,помидор:4,оливки:2'),(r'суп куриный|куриный бульон с','курица:10,макароны:6,картофель:8,морковь:3'),(r'гороховый','горох вареный:25,свинина:5,картофель:6'),

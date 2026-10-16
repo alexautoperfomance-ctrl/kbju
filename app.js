@@ -1,5 +1,5 @@
 'use strict';
-const VER='1.4.0';
+const VER='1.5.0';
 const $=s=>document.querySelector(s), R=Math.round, esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const MEALS=['завтрак','обед','ужин','перекус'], MI={завтрак:'🍳',обед:'🍲',ужин:'🍽️',перекус:'🍎'};
 const KEY='kbju.v1';
@@ -80,14 +80,22 @@ let lastAdv={};
 function render(){ $('#dlabel').textContent=tab==='diary'||(tab==='stats'&&statMode==='day')?fmtD(cur):({stats:'Статистика',recipes:'Рецепты',goals:'Цели',more:'Ещё'})[tab];
   $('#prev').style.visibility=$('#next').style.visibility=(tab==='diary'||tab==='stats')?'visible':'hidden';
   $('#nav').innerHTML=[['diary','📒','Дневник'],['stats','📊','Статистика'],['recipes','🍲','Рецепты'],['goals','🎯','Цели'],['more','⚙️','Ещё']].map(([k,i,n])=>`<button data-tab="${k}" class="${tab===k?'on':''}"><b>${i}</b>${n}</button>`).join('');
-  $('#app').innerHTML=({diary:vDiary,stats:vStats,recipes:vRecipes,goals:vGoals,more:vMore})[tab](); window.scrollTo(0,0)===0 }
+  $('#app').innerHTML=({diary:vDiary,stats:vStats,recipes:vRecipes,goals:vGoals,more:vMore})[tab](); if(tab==='diary')animMicro(); if(!render.keep)window.scrollTo(0,0); render.keep=false }
 function vDiary(){ const L=day(cur), t=tot(L), g=S.goals, w=S.water[cur]||0; const adv=advice(L,g,{water:w}); lastAdv.day=adv;
-  let h=`<div class="card">${summary(t,g)}</div>`;
+  let h=`<div class="card">${summary(t,g)}</div>`+diaryMicro(L);
   h+=`<div class="card">`+MEALS.map(m=>{ const es=L.filter(e=>e.meal===m), mt=tot(es);
     return `<div class="meal"><div class="mh">${MI[m]} ${m[0].toUpperCase()+m.slice(1)} <span class="mu">${es.length?R(mt.k)+' ккал':''}</span><button class="add" data-addm="${m}">＋</button></div>`+
      es.map(e=>`<div class="it il" data-edit="${e.id}"><span class="n">${esc(e.name)}</span><span class="mu">${R(e.g)}г</span><span class="mac">${R(e.p)}·${R(e.f)}·${R(e.c)}</span><span class="k">${R(e.k)}</span></div>`).join('')+`</div>` }).join('')+`</div>`;
   if(S.set.water) h+=`<div class="card row wrow"><b>💧 ${w}<span class="mu"> / ${g.w} мл</span></b><div class="wt sp">${Array.from({length:Math.ceil(g.w/250)},(_,i)=>`<i class="${i<w/250?'f':''}"></i>`).join('')}</div><button class="btn s sm" data-water="-250">−</button><button class="btn sm" data-water="250">＋250</button></div>`;
   return h+advHtml(adv,'day') }
+const SHORT={A:'Вит. A',D:'Вит. D',E:'Вит. E',K:'Вит. K',C:'Вит. C',B1:'B1',B2:'B2',B3:'B3 (PP)',B5:'B5',B6:'B6',B7:'B7 биотин',B9:'B9 фолаты',B12:'B12',Ch:'Холин',Ca:'Кальций',P:'Фосфор',Mg:'Магний',K_:'Калий',Na:'Натрий',Fe:'Железо',Zn:'Цинк',Cu:'Медь',Mn:'Марганец',Se:'Селен',I:'Йод',Cr:'Хром',Fib:'Клетчатка',O3:'Омега-3',Sug:'Сахара',Chol:'Холестерин'};
+let microPrev={};
+function diaryMicro(L){ const a=MICROS.analyze([L],S.prof,MK,microLookup); lastAdv.micro=a; const low=a.list.filter(d=>d.st==='low').length, over=a.list.filter(d=>d.st==='over').length, ok=a.list.length-low-over;
+  const order=MICROS.norms(S.prof).map(d=>d.k), list=order.map(k=>a.list.find(d=>d.k===k));
+  return `<details class="card col dm" data-k="d_micro" ${S.set.d_micro?'open':''}><summary class="row"><h2 class="sp">🧪 Витамины и минералы <span class="chev">▾</span></h2><span class="mu" id="dmsum">${L.length?`<b class="lo">дефицит ${low}</b> · норма ${ok}${over?` · <b class="hi">избыток ${over}</b>`:''}`:'нет записей'}</span></summary>
+  <div class="dmg">${list.map(d=>{ const w=Math.min(100,d.pct); return `<div class="dmr ${d.st}" data-mic="${d.k}"><span class="n">${SHORT[d.k]||esc(d.n)}</span><span class="b"><i data-w="${w}" style="width:${microPrev[d.k]!=null?microPrev[d.k]:0}%"></i><em>${R(d.pct)}%</em></span><span class="a">${R(d.amt)}/${R(d.norm)} ${d.u}</span></div>` }).join('')}</div>
+  <div class="mu" style="margin-top:3px;font-size:.66rem">Норма МР 2.3.1.0253-21 · натрий без соли при готовке · B7, йод, хром — оценка</div></details>` }
+function animMicro(){ requestAnimationFrame(()=>requestAnimationFrame(()=>document.querySelectorAll('.dmr i[data-w]').forEach(i=>{ i.style.width=i.dataset.w+'%'; microPrev[i.parentNode.parentNode.dataset.mic]=+i.dataset.w }))) }
 function periodKeys(mode){ const n=mode==='week'?7:30; return Array.from({length:n},(_,i)=>addD(cur,i-n+1)) }
 function chart(keys,key,goal,col,unit){ const W=400,H=95,vals=keys.map(k=>tot(day(k))[key]),mx=Math.max(goal*1.25,...vals,1),bw=W/keys.length;
   let s=`<svg viewBox="0 0 ${W} ${H+16}" width="100%"><line x1="0" x2="${W}" y1="${H-goal/mx*H}" y2="${H-goal/mx*H}" stroke="#738078" stroke-dasharray="4 4" stroke-width="1"/>`;
@@ -163,7 +171,8 @@ function renderItems(){ const el=$('#vres'); if(!el)return; if(!V.items.length){
   const t=tot(V.items.filter(i=>i.food));
   el.innerHTML=V.items.map((it,i)=>`<div class="pi"><div class="top"><button class="nm ${it.food?'':'bad'}" data-pick="${i}">${it.food?esc(it.food.n):'❓ «'+esc(it.text)+'» — выбрать'} <span class="mu">▾</span></button><b>${it.food?R(it.k)+' ккал':''}</b></div>
    <div class="ctl">${rm?'<span></span>':`<select data-imeal="${i}">${MEALS.map(m=>`<option ${it.meal===m?'selected':''}>${m}</option>`).join('')}</select>`}<div class="row"><input type="number" inputmode="numeric" data-ig="${i}" value="${R(it.g)}"><span class="mu">г</span></div><button class="x" data-idel="${i}">✕</button></div>
-   ${it.food?`<div class="mu" style="margin-top:4px">${chips(it)} <span>«${esc(it.raw)}»</span></div>`:''}</div>`).join('')+
+   ${it.food?`<div class="mu" style="margin-top:4px">${chips(it)} <span>«${esc(it.raw)}»</span></div>`:''}${it.note?`<div class="mu inote">🍽 ${esc(it.note)}</div>`:''}
+   ${it.unsure&&it.cands&&it.cands.length>1?`<div class="cands"><span class="mu">Точно? </span>${it.cands.map((c,j)=>`<button class="chip${j===0?' on':''}" data-cand="${i}:${j}">${esc(c.n)}</button>`).join('')}<button class="chip" data-pick="${i}">другое…</button></div>`:''}</div>`).join('')+
    `<div class="card" style="margin-top:6px"><div class="kv"><span>Итого</span><span><b>${R(t.k)}</b> ккал · ${chips(t)}</span></div><div class="row" style="margin-top:8px"><button class="btn sp" data-vsave="1">${rm?'Готово':'✅ Записать в дневник'}</button></div></div>` }
 function doParse(text){ const mealSel=$('#vmeal')&&$('#vmeal').value; const r=KP.parse(text,{index:index(),meal:mealSel||V.meal||(cur===dk()?null:'обед')||KP.defaultMeal(),noMeals:V.mode==='recipe'||!!mealSel});
   r.forEach(x=>{ if(!x.meal)x.meal=mealSel||V.meal||KP.defaultMeal(); if(mealSel)x.meal=mealSel }); V.items=V.items.concat(r); renderItems();
@@ -189,7 +198,7 @@ const micBtn=(target,act)=>SR?`<button class="micb" data-mict="${target}" data-m
 const pl=(n,a,b,c)=>{n=Math.abs(n)%100;const m=n%10;return n>10&&n<20?c:m===1?a:m>1&&m<5?b:c};
 function saveVoice(){ const ok=V.items.filter(i=>i.food&&i.g>0); if(!ok.length){toast('Нечего сохранять');return}
   if(V.mode==='recipe'){ RE.ings=RE.ings.concat(ok.map(i=>({n:i.food.n,g:R(i.g),k:i.food.k,p:i.food.p,f:i.food.f,c:i.food.c,m:i.food.m||microOf(i.food.n)||undefined}))); closeSheet(); openRecipe(); return }
-  const L=S.days[cur]=day(cur).slice(); ok.forEach(i=>{ L.push({id:uid(),meal:i.meal,name:i.food.n,g:R(i.g),k:i.k,p:i.p,f:i.f,c:i.c,k100:i.food.k,p100:i.food.p,f100:i.food.f,c100:i.food.c,cat:i.food.cat||'',src:i.food.src||'',m100:i.food.m||undefined}); S.used[i.food.n]=(S.used[i.food.n]||0)+1 });
+  const L=S.days[cur]=day(cur).slice(); ok.forEach(i=>{ L.push({id:uid(),meal:i.meal,name:i.food.n,g:R(i.g),k:i.k,p:i.p,f:i.f,c:i.c,k100:i.food.k,p100:i.food.p,f100:i.food.f,c100:i.food.c,cat:i.food.cat||'',src:i.food.src||'',m100:i.food.m||undefined,note:i.note||undefined}); S.used[i.food.n]=(S.used[i.food.n]||0)+1 });
   save(); dirty(); closeSheet(); render(); toast(`Записано: ${ok.length} · ${R(tot(ok).k)} ккал`) }
 // ---------- выбор продукта ----------
 let PK=null; // {cb, q}
@@ -244,13 +253,16 @@ function detailHtml(name,g,f100,m100){ const nm=MICROS.norms(S.prof), k=MK, n=KP
    <div class="mu" style="margin:2px 0 4px">${R(f100.k)} ккал на 100 г · % — от дневной нормы (${R(n.k/Math.max(1,S.goals.k)*100)}% калорий)</div>
    ${m?`<div class="dgrid">${nm.filter(d=>d.k!=='Fib'&&d.k!=='Sug').map(row).join('')}</div>`:'<div class="mu">Для этого продукта нет данных о витаминах и минералах.</div>'}` }
 let DT=null; // {name,f100,m100,g,mode,id}
+function edNote(o){ const f=fdb(o.name); if(o.note)return `<div class="mu" id="dnote" style="margin-top:4px">🍽 ${esc(o.note)}</div>`; if(!f||!f.rf)return '';
+  const w=f.cat==='nut'?'ядра':/яйц/.test(f.n)?'без скорлупы':/fish|meat/.test(f.cat||'')?'без костей':'мякоти';
+  return `<div class="mu" id="dnote" style="margin-top:4px">🍽 Вес — съедобная часть${f.pc?` · 1 шт ≈ ${R(f.pc)} г ${w}`:''} · отходы ${R(f.rf)}%</div>` }
 function openDetail(o){ DT=o; const isE=o.mode==='entry';
   sheet(`<div class="sh"><h2 style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(o.name)}</h2><button class="x" data-close${isE?'':'2'}="1">✕</button></div>
   <div class="row"><div style="width:96px"><input id="dg" type="number" inputmode="numeric" value="${R(o.g)}" aria-label="Граммы"></div><span class="mu">г</span>
    ${isE||o.mode==='add'?`<select id="dm" class="sp">${MEALS.map(m=>`<option ${o.meal===m?'selected':''}>${m}</option>`).join('')}</select>`:'<span class="sp"></span>'}</div>
-  <div id="dbody" style="margin-top:6px">${detailHtml(o.name,o.g,o.f100,o.m100)}</div>
+  ${edNote(o)}<div id="dbody" style="margin-top:6px">${detailHtml(o.name,o.g,o.f100,o.m100)}</div>
   <div class="row" style="margin-top:8px">${isE?`<button class="btn sp" data-esave="${o.id}">Сохранить</button><button class="btn s" data-ecopy="${o.id}">На сегодня</button><button class="btn r" data-edel="${o.id}">Удалить</button>`:o.mode==='add'?`<button class="btn sp" data-dadd="1">＋ В дневник</button>`:o.mode==='pick'?`<button class="btn sp" data-dpick="1">Выбрать</button>`:''}</div>`,isE?1:2) }
-function openEntry(e){ openDetail({mode:'entry',id:e.id,name:e.name,g:e.g,meal:e.meal,f100:{k:e.k100,p:e.p100,f:e.f100,c:e.c100},m100:e.m100}) }
+function openEntry(e){ openDetail({mode:'entry',id:e.id,name:e.name,g:e.g,meal:e.meal,f100:{k:e.k100,p:e.p100,f:e.f100,c:e.c100},m100:e.m100,note:e.note}) }
 function openEntryOld(e){ sheet(`<div class="sh"><h2>${esc(e.name)}</h2><button class="x" data-close="1">✕</button></div><div class="g2"><div><label>Граммы</label><input id="eg" type="number" inputmode="numeric" value="${R(e.g)}"></div><div><label>Приём пищи</label><select id="em">${MEALS.map(m=>`<option ${e.meal===m?'selected':''}>${m}</option>`).join('')}</select></div></div>
   <div class="mu" style="margin:6px 0">на 100 г: ${R(e.k100)} ккал · Б ${R(e.p100)} · Ж ${R(e.f100)} · У ${R(e.c100)}</div><div class="row"><button class="btn sp" data-esave="${e.id}">Сохранить</button><button class="btn s" data-ecopy="${e.id}">На сегодня</button><button class="btn r" data-edel="${e.id}">Удалить</button></div>`) }
 function addEntry(f,g,meal){ const n=KP.nutr(f,g); (S.days[cur]=day(cur).slice()).push({id:uid(),meal,name:f.n,g:R(g),k:n.k,p:n.p,f:n.f,c:n.c,k100:f.k,p100:f.p,f100:f.f,c100:f.c,cat:f.cat||'',src:f.src||'',m100:f.m||undefined}); S.used[f.n]=(S.used[f.n]||0)+1; save(); dirty() }
@@ -264,7 +276,8 @@ document.addEventListener('click',e=>{ const mr=e.target.closest('[data-mic]'); 
   if(d.close){closeSheet();return} if(d.close2){scanStop&&scanStop();closeSheet(2);return}
   if(d.mict){ const act=d.mica; micStart(d.mict,t,v=>{ if(act==='parse'){ if(v){V.items=[];doParse(v)} } else if(act==='search'){ showRes() } }); return } if(t.id==='vparse'){ const v=$('#vt').value; if(v.trim()){V.items=[];doParse(v)} return }
   if(d.idel){V.items.splice(+d.idel,1);renderItems();return}
-  if(d.pick){ const i=+d.pick, it=V.items[i]; openPicker(it.food?'':it.text,f=>{it.food=f; if(!it.num&&!it.unit)it.g=KP.grams(f,null,null,1); recalc(it); renderItems()},it.alts); return }
+  if(d.pick){ const i=+d.pick, it=V.items[i]; openPicker(it.food?'':it.text,f=>{it.food=f; it.unsure=false; it.note=''; if(!it.num&&!it.unit)it.g=KP.grams(f,null,null,1); recalc(it); renderItems()},it.alts); return }
+  if(d.cand){ const [i,j]=d.cand.split(':').map(Number), it=V.items[i], f=it.cands[j]; it.food=f; it.unsure=false; if(!(it.unit==='g'||(it.num>=20&&!it.unit)))it.g=KP.grams(f,it.num,it.unit?[0,it.unit,1]:null,1)||it.g; it.note=''; recalc(it); renderItems(); return }
   if(d.vsave){saveVoice();return}
   if(d.pinfo!=null){ const f=PR[+d.pinfo]; openDetail({mode:'pick',name:f.n,g:f.pc&&f.pc<=250?f.pc:(f.po||100),f100:f,m100:f.m,food:f}); return }
   if(d.dpick){ const f=DT.food; closeSheet(2); pickFood(f); return }
@@ -293,7 +306,7 @@ document.addEventListener('click',e=>{ const mr=e.target.closest('[data-mic]'); 
 });
 function readProf(){ const p=S.prof; p.sex=$('#cs').value; p.a=+$('#ca').value||p.a; p.w=+$('#cw').value||p.w; p.h=+$('#ch').value||p.h; p.act=+$('#cact').value; p.goal=$('#cg').value }
 document.addEventListener('input',e=>{ const t=e.target,d=t.dataset;
-  if(d.ig!=null){ const it=V.items[+d.ig]; it.g=+t.value||0; recalc(it); const top=t.closest('.pi').querySelector('.top b'); if(top&&it.food)top.textContent=R(it.k)+' ккал'; const cm=t.closest('.pi').querySelector('.mu[style]'); if(cm&&it.food)cm.innerHTML=chips(it)+' <span>«'+esc(it.raw)+'»</span>'; const tt=tot(V.items.filter(i=>i.food)), kv=$('#vres .card .kv span:last-child'); if(kv)kv.innerHTML='<b>'+R(tt.k)+'</b> ккал · '+chips(tt); return }
+  if(d.ig!=null){ const it=V.items[+d.ig]; it.g=+t.value||0; it.note=''; const nt=t.closest('.pi').querySelector('.inote'); if(nt)nt.remove(); recalc(it); const top=t.closest('.pi').querySelector('.top b'); if(top&&it.food)top.textContent=R(it.k)+' ккал'; const cm=t.closest('.pi').querySelector('.mu[style]'); if(cm&&it.food)cm.innerHTML=chips(it)+' <span>«'+esc(it.raw)+'»</span>'; const tt=tot(V.items.filter(i=>i.food)), kv=$('#vres .card .kv span:last-child'); if(kv)kv.innerHTML='<b>'+R(tt.k)+'</b> ккал · '+chips(tt); return }
   if(t.id==='dg'&&DT){ DT.g=+t.value||0; $('#dbody').innerHTML=detailHtml(DT.name,DT.g,DT.f100,DT.m100); return }
   if(t.id==='pq'){ clearTimeout(showRes.t); showRes.t=setTimeout(()=>showRes(),120); return }
   if(['cs','ca','cw','ch','cact','cg'].includes(t.id)){ readProf(); save(); $('#calc').innerHTML=calcHtml(mifflin(S.prof)); return }

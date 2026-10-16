@@ -1,0 +1,159 @@
+# Дополнение из USDA SR Legacy: name;synonyms;usda(query|#id|~k,p,f,c@аналог для микро);cat;gender;pc съедобной части г;отходы %;порция г
+@fruit
+папайя;папая;papayas raw;fruit;f;300;33;150
+личи;лиджи;litchis raw;fruit;n;10;40;100
+рамбутан;;rambutan canned syrup pack;fruit;m;9;50;100
+лонган;;longans raw;fruit;m;3;45;100
+дуриан;;durian raw or frozen;fruit;m;;68;150
+джекфрут;джекфрут плод;jackfruit raw;fruit;m;;70;150
+гуава;гуайява;guavas common raw;fruit;f;55;0;100
+питахайя;питайя/драконий фрукт/дракон фрукт/питахая;~57,1.2,0.4,13@киви;fruit;f;300;35;150
+карамбола;старфрут/звездный фрукт;carambola (starfruit) raw;fruit;f;91;3;100
+мангостин;мангустин;mangosteen canned syrup pack;fruit;m;25;70;100
+тамаринд;;tamarinds raw;fruit;m;2;34;30
+кумкват;кинкан;kumquats raw;fruit;m;19;7;60
+свити;оробланко;~58,0.7,0.2,11@грейпфрут;fruit;m;230;45;150
+черимойя;аннона;cherimoya raw;fruit;f;235;20;150
+саподилла;;sapodilla raw;fruit;f;170;20;150
+мушмула;локва;loquats raw;fruit;f;10;35;100
+кивано;рогатая дыня;#167791;fruit;n;209;37;150
+физалис;;groundcherries (cape-gooseberries or poha) raw;fruit;m;2;6;50
+плантан;банан овощной;plantains yellow raw;fruit;m;179;35;150
+клементин;клементины;clementines raw;fruit;m;74;23;74
+танжерин;;tangerines (mandarin oranges) raw;fruit;m;88;26;88
+айва;;quinces raw;fruit;f;92;39;150
+шелковица;тутовник/тутовая ягода;mulberries raw;fruit;f;;0;100
+ежевика;;blackberries raw;fruit;f;;0;100
+голубика;;blueberries raw;fruit;f;;0;100
+морошка;;cloudberries raw (alaska native);fruit;f;;0;100
+жимолость;;~41,0,0,8@черника;fruit;f;;0;100
+ирга;;~85,1.3,0.5,19@черника;fruit;f;;0;100
+бузина;;elderberries raw;fruit;f;;0;50
+черемуха;;chokecherries raw (northern plains indians);fruit;f;;0;100
+арония;черноплодная рябина/черноплодка;~55,1.5,0.2,11@черника;fruit;f;;0;100
+рябина;рябина красная;~50,1.4,0.2,9@клюква;fruit;f;;0;50
+кизил;;~45,1,0,10@вишня;fruit;m;;10;100
+алыча;;~34,0.2,0.1,7.9@слива;fruit;f;25;10;100
+калина;;~26,0,0,7@клюква;fruit;f;;0;50
+виноград кишмиш;кишмиш;grapes red or green (european type such as thompson seedless) raw;fruit;m;;0;150
+апельсин красный;королек;oranges raw all commercial varieties;fruit;m;130;27;130
+ананас консервированный;ананасы консервированные;pineapple canned heavy syrup pack solids and liquids;fruit;m;;0;100
+персики консервированные;персик консервированный;peaches canned heavy syrup pack solids and liquids;fruit;p;;0;100
+абрикосы консервированные;;apricots canned heavy syrup pack with skin solids and liquids;fruit;p;;0;100
+груши консервированные;;pears canned heavy syrup pack solids and liquids;fruit;p;;0;100
+черешня консервированная;;cherries sweet canned pitted heavy syrup pack solids and liquids;fruit;f;;0;100
+мандарины консервированные;;tangerines (mandarin oranges) canned light syrup pack;fruit;p;;0;100
+фруктовый коктейль;фруктовое ассорти консервированное;fruit cocktail (peach and pineapple and pear and grape and cherry) canned heavy syrup solids and liquids;fruit;m;;0;100
+манго сушеное;сушеный манго/манго вяленое;~319,2.5,1.2,78@манго;nut;n;;0;30
+бананы сушеные;банановые чипсы/сушеный банан;bananas dehydrated or banana powder;nut;p;;0;30
+яблоки сушеные;сушеные яблоки/сушка яблочная;apples dried sulfured uncooked;nut;p;;0;30
+груши сушеные;сушеные груши;pears dried sulfured uncooked;nut;p;;0;30
+персики сушеные;;peaches dried sulfured uncooked;nut;p;;0;30
+клюква сушеная;вяленая клюква;cranberries dried sweetened;nut;f;;0;30
+черника сушеная;;blueberries dried sweetened;nut;f;;0;30
+финики деглет нур;;dates deglet noor;nut;p;7;10;30
+цукаты;;~320,0.5,0.2,80@ананас;sweet;p;;0;30
+сок ананасовый;ананасовый сок;pineapple juice canned or bottled unsweetened without added ascorbic acid;drink;m;;0;200
+сок виноградный;виноградный сок;grape juice canned or bottled unsweetened without added ascorbic acid;drink;m;;0;200
+сок гранатовый;гранатовый сок;pomegranate juice bottled;drink;m;;0;200
+сок клюквенный;клюквенный сок;cranberry juice unsweetened;drink;m;;0;200
+сок лимонный;лимонный сок;lemon juice raw;drink;m;;0;15
+сок морковный;морковный сок;carrot juice canned;drink;m;;0;200
+нектар персиковый;персиковый сок/сок персиковый;peach nectar canned without added ascorbic acid;drink;m;;0;200
+нектар абрикосовый;абрикосовый сок/сок абрикосовый;#171704;drink;m;;0;200
+нектар грушевый;грушевый сок/сок грушевый;pear nectar canned without added ascorbic acid;drink;m;;0;200
+нектар манго;сок манго/манговый сок;mango nectar canned;drink;m;;0;200
+сок сливовый;сок черносливовый;prune juice canned;drink;m;;0;200
+сок маракуйи;сок маракуйя/сок маракуйи;passion-fruit juice purple raw;drink;m;;0;200
+@nut
+бразильский орех;бразильские орехи;nuts brazilnuts dried unblanched;nut;m;5;50;30
+макадамия;орех макадамия;nuts macadamia nuts raw;nut;f;3;65;30
+пекан;орех пекан;nuts pecans;nut;m;5;47;30
+каштан;каштаны жареные;nuts chestnuts european roasted;nut;m;8;18;50
+кокосовая стружка;кокосовые хлопья;nuts coconut meat dried (desiccated) not sweetened;nut;f;;0;10
+семена конопли;конопляные семечки;seeds hemp seed hulled;nut;p;;0;15
+мак;семена мака;spices poppy seed;nut;m;;0;5
+арахис жареный;жареный арахис;peanuts all types dry-roasted without salt;nut;m;1;27;30
+@veg
+артишок;;artichokes (globe or french) raw;veg;m;120;60;120
+руккола;рукола;arugula raw;veg;f;;0;30
+щавель;;dock raw;veg;m;;0;50
+лук-порей;порей/лук порей;leeks (bulb and lower leaf-portion) raw;veg;m;89;44;80
+черемша;дикий чеснок;~35,2.4,0.1,6.5@лук-порей;veg;f;;0;30
+фенхель;;fennel bulb raw;veg;m;234;28;100
+пастернак;;parsnips raw;veg;m;133;15;100
+корень сельдерея;сельдерей корневой;celeriac raw;veg;m;400;14;100
+кольраби;;kohlrabi raw;veg;f;135;27;100
+топинамбур;земляная груша;jerusalem-artichokes raw;veg;m;50;10;100
+патиссон;;squash summer scallop raw;veg;m;200;2;150
+капуста кале;кале/кейл;kale raw;veg;f;;0;50
+бок-чой;бок чой/пак-чой;cabbage chinese (pak-choi) raw;veg;m;;10;100
+мангольд;;chard swiss raw;veg;m;;8;100
+ревень;;rhubarb raw;veg;m;51;25;100
+ростки маша;проростки/ростки фасоли;mung beans mature seeds sprouted raw;veg;p;;0;50
+морская капуста;ламинария;seaweed kelp raw;veg;f;;0;50
+нори;;seaweed laver raw;veg;f;3;0;3
+эдамаме;соевые бобы зеленые;edamame frozen prepared;veg;n;;0;100
+бамия;окра;okra raw;veg;f;12;14;100
+перец чили;чили/острый перец;peppers hot chili red raw;veg;m;45;27;10
+халапеньо;;peppers jalapeno raw;veg;m;14;8;20
+перец зеленый;зеленый перец;peppers sweet green raw;veg;m;119;18;100
+перец желтый;желтый перец;peppers sweet yellow raw;veg;m;186;10;100
+лук шалот;шалот;shallots raw;veg;m;10;12;30
+кресс-салат;кресс салат;cress garden raw;veg;m;;0;20
+базилик;;basil fresh;veg;m;;36;5
+мята;;spearmint fresh;veg;f;;0;3
+эндивий;цикорий салатный;endive raw;veg;m;;14;50
+грибы шиитаке;шиитаке;mushrooms shiitake raw;veg;p;19;0;100
+грибы эноки;эноки;mushrooms enoki raw;veg;p;;0;100
+портобелло;грибы портобелло;mushrooms portabella raw;veg;p;84;0;100
+сморчки;;morel mushrooms raw;veg;p;;0;100
+@grain
+амарант;;amaranth grain cooked;grain;m;;0;200
+спельта;полба;spelt cooked;grain;f;;0;200
+дикий рис;рис дикий;wild rice cooked;grain;m;;0;200
+маш;бобы маш;mung beans mature seeds cooked boiled without salt;grain;m;;0;150
+соя;соевые бобы;soybeans mature cooked boiled without salt;grain;f;;0;150
+фасоль белая;белая фасоль;beans white mature seeds cooked boiled without salt;grain;f;;0;150
+фасоль черная;черная фасоль;beans black mature seeds cooked boiled without salt;grain;f;;0;150
+чечевица красная;красная чечевица;lentils pink or red raw;grain;f;;0;60
+@fish
+палтус;;fish halibut atlantic and pacific raw;fish;m;;0;150
+мойва;;fish smelt rainbow raw;fish;f;20;30;150
+корюшка;;fish smelt rainbow raw;fish;f;25;30;150
+анчоусы;хамса/анчоус;fish anchovy european raw;fish;p;;0;50
+угорь;;fish eel mixed species raw;fish;m;;0;100
+осетр;осетрина;fish sturgeon mixed species raw;fish;m;;0;150
+сом;;fish catfish channel wild raw;fish;m;;0;150
+пикша;;fish haddock raw;fish;f;;0;150
+зубатка;;fish wolffish atlantic raw;fish;f;;0;150
+кефаль;;fish mullet striped raw;fish;f;;0;150
+рыба-меч;меч-рыба;fish swordfish raw;fish;f;;0;150
+сардина;сардины;fish sardine atlantic canned in oil drained solids with bone;fishready;f;12;0;100
+краб;крабы/мясо краба;crustaceans crab alaska king raw;fish;m;;0;100
+лобстер;омар;crustaceans lobster northern raw;fish;m;;0;150
+морской гребешок;гребешки/гребешок;mollusks scallop mixed species raw;fish;m;;0;100
+устрицы;устрица;mollusks oyster eastern wild raw;fish;p;15;0;100
+осьминог;;mollusks octopus common raw;fish;m;;0;100
+каракатица;;mollusks cuttlefish mixed species raw;fish;f;;0;100
+раки;рак/раковые шейки;crustaceans crayfish mixed species farmed raw;fish;p;10;80;100
+@meat
+оленина;олень;game meat deer raw;meat;f;;0;150
+лосятина;лось;game meat moose raw;meat;f;;0;150
+конина;;game meat horse raw;meat;f;;0;150
+перепел;перепелка;quail meat only raw;meat;m;90;30;150
+цесарка;;guinea hen meat only raw;meat;f;;0;150
+говяжьи почки;почки;beef variety meats and by-products kidneys raw;meat;p;;0;100
+говяжье сердце;сердце говяжье;beef variety meats and by-products heart raw;meat;n;;0;100
+свиная печень;печень свиная;pork fresh variety meats and by-products liver raw;meat;f;;0;100
+рубец;требуха;beef variety meats and by-products tripe raw;meat;m;;0;100
+@dairyfix
+молоко сухое;сухое молоко;milk dry whole without added vitamin d;dairyfix;n;;0;30
+сыворотка молочная;сыворотка;whey sweet fluid;dairyfix;f;;0;250
+сыр козий;козий сыр;cheese goat soft type;dairyfix;m;;0;30
+сыр эмменталь;эмменталь;cheese swiss;dairyfix;m;;0;30
+сыр бри;бри;cheese brie;dairyfix;m;;0;30
+сыр рокфор;рокфор;cheese roquefort;dairyfix;m;;0;30
+сыр эдам;эдам;cheese edam;dairyfix;m;;0;30
+сыр пошехонский;пошехонский;cheese gouda;dairyfix;m;;0;30
+масло топленое;гхи/топленое масло;butter oil anhydrous;dairyfix;n;;0;10
