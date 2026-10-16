@@ -1,10 +1,10 @@
 'use strict';
-const VER='1.3.0';
+const VER='1.4.0';
 const $=s=>document.querySelector(s), R=Math.round, esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const MEALS=['завтрак','обед','ужин','перекус'], MI={завтрак:'🍳',обед:'🍲',ужин:'🍽️',перекус:'🍎'};
 const KEY='kbju.v1';
-let S=load(); function load(){ try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.days)return Object.assign(def(),s)}catch(e){} return def() }
-function def(){ return {days:{},water:{},recipes:[],custom:[],used:{},goals:{k:2200,p:140,f:70,c:240,w:2000},prof:{sex:'m',w:80,h:180,a:35,act:1.375,goal:'keep'},set:{auto:true,water:true},v:1} }
+let S=load(); function load(){ try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.days){const x=Object.assign(def(),s); if(x.set)delete x.set.auto; return x}}catch(e){} return def() }
+function def(){ return {days:{},water:{},recipes:[],custom:[],used:{},goals:{k:2200,p:140,f:70,c:240,w:2000},prof:{sex:'m',w:80,h:180,a:35,act:1.375,goal:'keep'},set:{water:true},v:1} }
 function save(){ localStorage.setItem(KEY,JSON.stringify(S)) }
 const dk=d=>{d=d||new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const pd=k=>{const[a,b,c]=k.split('-').map(Number);return new Date(a,b-1,c)};
@@ -21,11 +21,6 @@ let IX=null; function index(){ if(!IX){ const rec=S.recipes.map(r=>Object.assign
   IX=KP.makeIndex(foods.concat(cus),rec) } return IX }
 function dirty(){IX=null}
 // ---------- речь ----------
-const TTS='speechSynthesis' in window; let ruVoice=null;
-function pickVoice(){ if(!TTS)return; const v=speechSynthesis.getVoices(); ruVoice=v.find(x=>/^ru/i.test(x.lang)&&/Milena|Yuri|Google/i.test(x.name))||v.find(x=>/^ru/i.test(x.lang))||null }
-if(TTS){pickVoice();speechSynthesis.onvoiceschanged=pickVoice}
-function speak(t){ if(!TTS||!t)return; speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(t.replace(/[🍳🍲🍽️🍎💧✅⚠️👍🥩🥑🍞🥗🔥]/gu,'').replace(/ г\b/g,' грамм').replace(/ккал/g,'килокалорий'));
-  u.lang='ru-RU'; if(ruVoice)u.voice=ruVoice; u.rate=1.02; speechSynthesis.speak(u) }
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
 const isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone;
@@ -80,7 +75,7 @@ function bar(name,v,g,col){ return `<div class="bar"><div class="t"><span>${name
 function summary(t,g,mul){ mul=mul||1; const left=R(g.k*mul-t.k);
   return `<div class="sum">${ring(t.k,g.k*mul,92,'var(--K)',R(t.k),left>=0?'осталось '+left:'перебор '+(-left))}<div class="bars">${bar('Белки',t.p,g.p*mul,'var(--P)')}${bar('Жиры',t.f,g.f*mul,'var(--F)')}${bar('Углеводы',t.c,g.c*mul,'var(--C)')}<div class="mu">цель ${R(g.k*mul)} ккал</div></div></div>` }
 const chips=e=>`<span class="chip cP">Б ${R(e.p)}</span><span class="chip cF">Ж ${R(e.f)}</span><span class="chip cC">У ${R(e.c)}</span>`;
-function advHtml(list,sayId){ const k='adv_'+sayId; return `<details class="card col" data-k="${k}" ${S.set[k]?'open':''}><summary class="row"><h2 class="sp">💡 Советы <span class="mu">${list.length}</span></h2><button class="btn s sm" data-say="${sayId}" onclick="event.preventDefault()">🔊</button><span class="chev">›</span></summary>${list.map(([i,t])=>`<div class="adv"><span>${i}</span><span>${esc(t)}</span></div>`).join('')}</details>` }
+function advHtml(list,sayId){ const k='adv_'+sayId; return `<details class="card col" data-k="${k}" ${S.set[k]?'open':''}><summary class="row"><h2 class="sp">💡 Советы <span class="mu">${list.length}</span></h2><span class="chev">›</span></summary>${list.map(([i,t])=>`<div class="adv"><span>${i}</span><span>${esc(t)}</span></div>`).join('')}</details>` }
 let lastAdv={};
 function render(){ $('#dlabel').textContent=tab==='diary'||(tab==='stats'&&statMode==='day')?fmtD(cur):({stats:'Статистика',recipes:'Рецепты',goals:'Цели',more:'Ещё'})[tab];
   $('#prev').style.visibility=$('#next').style.visibility=(tab==='diary'||tab==='stats')?'visible':'hidden';
@@ -116,9 +111,9 @@ function vStats(){ const seg=`<div class="seg">${[['day','День'],['week','Н
   h+=`<details class="card col" data-k="c_prot" ${S.set.c_prot?'open':''}><summary class="row"><h2 class="sp">Белок по дням</h2><span class="chev">›</span></summary>${chart(keys,'p',g.p,'#3b82f6')}</details>`;
   const tf=topFoods(all); h+=`<details class="card col" data-k="c_top" ${S.set.c_top?'open':''}><summary class="row"><h2 class="sp">Топ продуктов</h2><span class="chev">›</span></summary>${tf.length?tf.map(x=>`<div class="kv"><span>${esc(x.n)} <span class="mu">×${x.c}</span></span><b>${R(x.k)} ккал</b></div>`).join(''):'<div class="empty">Нет записей</div>'}</details>`;
   lastAdv.stat=periodAdvice(keys); return h+advHtml(lastAdv.stat,'stat') }
-function vNutri(keys){ const ma=MICROS.analyze(keys.map(day),S.prof,MK,microLookup); const r=NUTRI.analyze({days:keys.map(k=>({key:k,entries:day(k),water:S.water[k]||0})),goals:S.goals,prof:S.prof,tdee:mifflin(S.prof).tdee,mode:statMode,trackWater:S.set.water,micro:ma.list,microAdvice:d=>MICROS.gapAdvice(d,self.FOODS,MK,self.MICRO)}); lastAdv.nutri=[[0,r.speech]];
+function vNutri(keys){ const ma=MICROS.analyze(keys.map(day),S.prof,MK,microLookup); const r=NUTRI.analyze({days:keys.map(k=>({key:k,entries:day(k),water:S.water[k]||0})),goals:S.goals,prof:S.prof,tdee:mifflin(S.prof).tdee,mode:statMode,trackWater:S.set.water,micro:ma.list,microAdvice:d=>MICROS.gapAdvice(d,self.FOODS,MK,self.MICRO)});
   const col=r.score>=8?'var(--g)':r.score>=5?'var(--F)':'var(--red)';
-  return `<details class="card nutri" ${S.set.nutriOpen?'open':''}><summary class="row"><h2 class="sp" style="margin:0">🩺 Нутрициолог</h2>${r.empty?'':`<span class="score" style="background:${col}">${r.score}/10</span>`}<button class="btn s sm" data-say="nutri" onclick="event.preventDefault()">🔊</button><span class="chev">›</span></summary>
+  return `<details class="card nutri" ${S.set.nutriOpen?'open':''}><summary class="row"><h2 class="sp" style="margin:0">🩺 Нутрициолог</h2>${r.empty?'':`<span class="score" style="background:${col}">${r.score}/10</span>`}<span class="chev">›</span></summary>
   ${r.empty?`<div class="mu" style="margin-top:6px">${esc(r.plan[0])}</div>`:`
   <h3>👍 Сильные стороны</h3>${r.strengths.map(x=>`<div class="adv"><span>✅</span><span>${esc(x.t)}</span></div>`).join('')||'<div class="mu">—</div>'}
   <h3>⚠️ Что улучшить</h3>${r.problems.map(x=>`<div class="adv"><span>🔸</span><span>${esc(x.t)}${x.swap?`<br><b class="swap">→ ${esc(x.swap)}</b>`:''}</span></div>`).join('')||'<div class="mu">Серьёзных проблем нет.</div>'}
@@ -131,7 +126,7 @@ function recipeNut(r){ const s=r.ings.reduce((a,i)=>(a.k+=i.k*i.g/100,a.p+=i.p*i
   return {k:s.k/y*100,p:s.p/y*100,f:s.f/y*100,c:s.c/y*100,raw:s.g,m} }
 function vRecipes(){ let h=`<div class="card"><div class="row"><h2 class="sp">Мои рецепты</h2><button class="btn sm" data-newrec="1">＋ Рецепт</button></div><div class="mu">Добавляй голосом по названию: «мой плов 300 грамм» или «порция борща мамы».</div></div>`;
   if(!S.recipes.length) h+=`<div class="card empty">Рецептов пока нет.<br>Создай рецепт вручную или надиктуй ингредиенты.<br><br><button class="btn" data-newrec="voice">🎙️ Надиктовать рецепт</button></div>`;
-  S.recipes.forEach(r=>{const n=recipeNut(r),sv=r.yield/Math.max(1,r.servings);h+=`<div class="card"><div class="row"><h2 class="sp">${esc(r.name)}</h2><button class="btn s sm" data-editrec="${r.id}">✎</button><button class="btn sm" data-userec="${r.id}">В дневник</button></div>
+  S.recipes.forEach(r=>{const n=recipeNut(r),sv=r.yield/Math.max(1,r.servings);h+=`<div class="card"><div class="row"><h2 class="sp">${esc(r.name)}</h2><button class="btn s sm" data-recinfo="${r.id}" aria-label="Состав порции">ⓘ</button><button class="btn s sm" data-editrec="${r.id}">✎</button><button class="btn sm" data-userec="${r.id}">В дневник</button></div>
    <div class="mu">${r.ings.length} ингр. · выход ${R(r.yield)} г · ${r.servings} порц. по ${R(sv)} г</div>
    <div class="kv"><span>на 100 г</span><span><b>${R(n.k)}</b> ккал · ${chips(n)}</span></div><div class="kv"><span>на порцию</span><span><b>${R(n.k*sv/100)}</b> ккал · ${chips({p:n.p*sv/100,f:n.f*sv/100,c:n.c*sv/100})}</span></div></div>`});
   return h }
@@ -147,7 +142,7 @@ function vGoals(){ const g=S.goals,p=S.prof,m=mifflin(p);
   <label>Цель</label><select id="cg">${[['lose','похудение (−18%)'],['keep','поддержание'],['gain','набор массы (+10%)']].map(([v,n])=>`<option value="${v}" ${p.goal===v?'selected':''}>${n}</option>`).join('')}</select>
   <div id="calc" style="margin-top:8px">${calcHtml(m)}</div><button class="btn w s" data-applycalc="1">Применить к целям</button></div>` }
 const calcHtml=m=>`<div class="kv"><span>Базовый обмен</span><b>${R(m.bmr)} ккал</b></div><div class="kv"><span>С активностью</span><b>${R(m.tdee)} ккал</b></div><div class="kv"><span>Рекомендуемо</span><b>${m.k} ккал · Б ${m.p} · Ж ${m.f} · У ${m.c}</b></div>`;
-function vMore(){ return `<div class="card"><h2>Настройки</h2><div class="tog"><span>🔊 Озвучивать после записи</span><input type="checkbox" id="sauto" ${S.set.auto?'checked':''}></div><div class="tog"><span>💧 Учёт воды</span><input type="checkbox" id="swater" ${S.set.water?'checked':''}></div>
+function vMore(){ return `<div class="card"><h2>Настройки</h2><div class="tog"><span>💧 Учёт воды</span><input type="checkbox" id="swater" ${S.set.water?'checked':''}></div>
   <div class="mu">Голос: ${SR?'распознавание речи доступно':'встроенное распознавание недоступно — используй 🎤 на клавиатуре iPhone'}${isIOS?' · iOS':''}${standalone?' · приложение':''}</div></div>
   <div class="card"><h2>Данные</h2><div class="mu">Всё хранится только на этом устройстве. Делай резервную копию.</div><div class="row" style="margin-top:8px"><button class="btn s sp" data-export="1">⬇️ Экспорт</button><label class="btn s sp" style="margin:0;text-align:center;color:var(--g);font-size:.95rem">⬆️ Импорт<input type="file" id="imp" accept=".json,application/json" hidden></label></div>
   <button class="btn r w" style="margin-top:8px" data-wipe="1">Удалить все данные</button></div>
@@ -155,12 +150,12 @@ function vMore(){ return `<div class="card"><h2>Настройки</h2><div clas
   <button class="btn s sm" style="margin-top:8px" data-update="1">Проверить обновление</button></div>` }
 // ---------- шиты ----------
 function sheet(html,n){ const s=$(n===2?'#sheet2':'#sheet'); $(n===2?'#sbody2':'#sbody').innerHTML=html; s.classList.add('on') }
-function closeSheet(n){ $(n===2?'#sheet2':'#sheet').classList.remove('on'); if(n!==2&&rec)stopRec() }
+function closeSheet(n){ $(n===2?'#sheet2':'#sheet').classList.remove('on'); micCancel() }
 let V={items:[],mode:'diary',meal:null}; // голосовой ввод
-function openVoice(meal,mode){ V={items:[],mode:mode||'diary',meal:meal||null}; renderVoice(); if(SR&&!(isIOS&&standalone))setTimeout(startRec,150) }
+function openVoice(meal,mode){ V={items:[],mode:mode||'diary',meal:meal||null}; renderVoice() }
 function renderVoice(){ const rm=V.mode==='recipe', ex=rm?'«500 грамм риса, 400 грамм говядины, 2 моркови, луковица, 3 ложки масла»':'«на завтрак два яйца и кофе с молоком, на обед 200 грамм гречки и куриная грудка»';
   sheet(`<div class="sh"><h2>${rm?'Ингредиенты голосом':'Что ты съел?'}</h2><button class="x" data-close="1">✕</button></div>
-  ${SR?`<button class="mic" id="mic">🎙️</button><div class="mu" style="text-align:center" id="mst">Нажми и говори</div>`:''}
+  ${SR?`<button class="mic" id="mic" data-mict="vt" data-mica="parse" aria-label="Микрофон">🎙️</button><div class="mu" style="text-align:center" id="mst">Нажми и говори</div>`:''}
   ${!SR||isIOS?`<div class="hint">${SR?'Если микрофон не сработал — ':''}нажми в поле ниже и используй 🎤 <b>диктовку на клавиатуре iPhone</b>, затем «Разобрать».</div>`:''}
   <textarea id="vt" placeholder="${ex}"></textarea><div class="row" style="margin-top:6px">${rm?'':`<select id="vmeal" style="width:auto"><option value="">приём по фразе/времени</option>${MEALS.map(m=>`<option ${V.meal===m?'selected':''}>${m}</option>`).join('')}</select>`}<button class="btn sp" id="vparse">Разобрать</button></div>
   <div id="vres" style="margin-top:10px"></div>`); }
@@ -169,32 +164,39 @@ function renderItems(){ const el=$('#vres'); if(!el)return; if(!V.items.length){
   el.innerHTML=V.items.map((it,i)=>`<div class="pi"><div class="top"><button class="nm ${it.food?'':'bad'}" data-pick="${i}">${it.food?esc(it.food.n):'❓ «'+esc(it.text)+'» — выбрать'} <span class="mu">▾</span></button><b>${it.food?R(it.k)+' ккал':''}</b></div>
    <div class="ctl">${rm?'<span></span>':`<select data-imeal="${i}">${MEALS.map(m=>`<option ${it.meal===m?'selected':''}>${m}</option>`).join('')}</select>`}<div class="row"><input type="number" inputmode="numeric" data-ig="${i}" value="${R(it.g)}"><span class="mu">г</span></div><button class="x" data-idel="${i}">✕</button></div>
    ${it.food?`<div class="mu" style="margin-top:4px">${chips(it)} <span>«${esc(it.raw)}»</span></div>`:''}</div>`).join('')+
-   `<div class="card" style="margin-top:6px"><div class="kv"><span>Итого</span><span><b>${R(t.k)}</b> ккал · ${chips(t)}</span></div><div class="row" style="margin-top:8px"><button class="btn s" data-vsay="1">🔊</button><button class="btn sp" data-vsave="1">${rm?'Готово':'✅ Записать в дневник'}</button></div></div>` }
+   `<div class="card" style="margin-top:6px"><div class="kv"><span>Итого</span><span><b>${R(t.k)}</b> ккал · ${chips(t)}</span></div><div class="row" style="margin-top:8px"><button class="btn sp" data-vsave="1">${rm?'Готово':'✅ Записать в дневник'}</button></div></div>` }
 function doParse(text){ const mealSel=$('#vmeal')&&$('#vmeal').value; const r=KP.parse(text,{index:index(),meal:mealSel||V.meal||(cur===dk()?null:'обед')||KP.defaultMeal(),noMeals:V.mode==='recipe'||!!mealSel});
   r.forEach(x=>{ if(!x.meal)x.meal=mealSel||V.meal||KP.defaultMeal(); if(mealSel)x.meal=mealSel }); V.items=V.items.concat(r); renderItems();
   if(!r.length)toast('Не понял. Попробуй: «200 грамм гречки»') }
 function recalc(it){ if(it.food)Object.assign(it,KP.nutr(it.food,it.g)) }
-let rec=null,recText='';
-function startRec(){ if(!SR)return; if(rec){stopRec();return} try{ rec=new SR(); }catch(e){toast('Распознавание недоступно');return}
-  rec.lang='ru-RU'; rec.interimResults=true; rec.continuous=!isIOS; recText=''; const base=($('#vt')||{}).value||'';
-  rec.onresult=e=>{ let fin='',tmp=''; for(let i=0;i<e.results.length;i++){ const r=e.results[i]; if(r.isFinal)fin+=r[0].transcript+' '; else tmp+=r[0].transcript } recText=fin; const vt=$('#vt'); if(vt)vt.value=(base?base+' ':'')+fin+tmp };
-  rec.onerror=e=>{ const st=$('#mst'); if(st)st.textContent=e.error==='not-allowed'||e.error==='service-not-allowed'?'Нет доступа к микрофону — используй диктовку клавиатуры 🎤':'Ошибка: '+e.error; };
-  rec.onend=()=>{ const m=$('#mic'); if(m)m.classList.remove('on'); const st=$('#mst'); if(st&&!/Ошибка|доступа/.test(st.textContent))st.textContent='Нажми и говори'; rec=null; const vt=$('#vt'); if(vt&&vt.value.trim()&&recText.trim()){ V.items=[]; doParse(vt.value) } };
-  try{ rec.start(); const m=$('#mic'); if(m)m.classList.add('on'); const st=$('#mst'); if(st)st.textContent='Слушаю… нажми ещё раз, чтобы закончить'; }catch(e){ rec=null } }
-function stopRec(){ try{rec&&rec.stop()}catch(e){} }
-function speakSummary(items){ const t=tot(items), L=day(cur), dt=tot(L), g=S.goals; const a=advice(L,g,{water:S.water[cur]||0});
-  speak(`Записал ${items.length} ${pl(items.length,'позицию','позиции','позиций')}, ${R(t.k)} ккал. За день ${R(dt.k)} из ${g.k}. Белки ${R(dt.p)}, жиры ${R(dt.f)}, углеводы ${R(dt.c)} г. ${a[0][1]}`) }
+// Микрофон-переключатель: 1-е нажатие — старт, 2-е — стоп и разбор. continuous + interim; на iOS сессия сама завершается — перезапускаем, пока не нажали «стоп».
+const MIC={sr:null,on:false,target:null,btn:null,base:'',fin:'',tmp:'',done:null,restarts:0};
+function micStart(target,btn,done){ if(!SR){ const el=$('#'+target); if(el)el.focus(); toast('Используй 🎤 на клавиатуре iPhone'); return }
+  if(MIC.on){ micStop(); return }
+  const el=$('#'+target); Object.assign(MIC,{on:true,target,btn,done,base:el&&el.value.trim()?el.value.trim()+' ':'',fin:'',tmp:'',restarts:0});
+  document.querySelectorAll('.micb,.mic').forEach(b=>b.classList.toggle('on',b===btn)); const st=$('#mst'); if(st)st.textContent='Слушаю… нажми ещё раз, чтобы закончить'; micSession() }
+function micSession(){ let r; try{ r=new SR() }catch(e){ MIC.on=false; micUI(); toast('Распознавание недоступно'); return } MIC.sr=r;
+  r.lang='ru-RU'; r.continuous=true; r.interimResults=true; r.maxAlternatives=1;
+  r.onresult=e=>{ let tmp=''; for(let i=e.resultIndex||0;i<e.results.length;i++){ const x=e.results[i]; if(x.isFinal)MIC.fin+=x[0].transcript.trim()+' '; else tmp+=x[0].transcript } MIC.tmp=tmp; const el=$('#'+MIC.target); if(el){el.value=(MIC.base+MIC.fin+tmp).replace(/\s+/g,' ').trimStart(); el.dispatchEvent(new Event('input',{bubbles:true}))} };
+  r.onerror=e=>{ if(e.error==='not-allowed'||e.error==='service-not-allowed'||e.error==='audio-capture'){ MIC.on=false; micUI(); const st=$('#mst'); if(st)st.textContent='Нет доступа к микрофону — используй диктовку клавиатуры 🎤'; else toast('Нет доступа к микрофону') } };
+  r.onend=()=>{ if(MIC.sr!==r)return; if(MIC.on){ MIC.fin+=MIC.tmp?MIC.tmp+' ':''; MIC.tmp=''; MIC.restarts++; setTimeout(()=>{ if(MIC.on)micSession() },120); } else micFinish() };
+  try{ r.start() }catch(e){ MIC.on=false; micUI() } }
+function micStop(){ if(!MIC.sr){MIC.on=false;micUI();return} MIC.on=false; micUI(); try{ MIC.sr.stop() }catch(e){ micFinish() } setTimeout(()=>{ if(MIC.sr)micFinish() },1500) }
+function micFinish(){ const r=MIC.sr; MIC.sr=null; if(!r&&!MIC.done)return; const el=$('#'+MIC.target); if(el&&MIC.tmp){ el.value=(MIC.base+MIC.fin+MIC.tmp).trim(); } MIC.tmp=''; const cb=MIC.done; MIC.done=null; if(cb&&el)cb(el.value.trim()) }
+function micUI(){ document.querySelectorAll('.micb,.mic').forEach(b=>b.classList.toggle('on',MIC.on&&b===MIC.btn)); const st=$('#mst'); if(st&&!MIC.on&&!/доступа/.test(st.textContent))st.textContent='Нажми и говори' }
+function micCancel(){ if(MIC.on||MIC.sr){ MIC.done=null; MIC.on=false; try{MIC.sr&&MIC.sr.abort()}catch(e){} MIC.sr=null; micUI() } }
+const micBtn=(target,act)=>SR?`<button class="micb" data-mict="${target}" data-mica="${act}" aria-label="Диктовать">🎙️</button>`:'';
 const pl=(n,a,b,c)=>{n=Math.abs(n)%100;const m=n%10;return n>10&&n<20?c:m===1?a:m>1&&m<5?b:c};
 function saveVoice(){ const ok=V.items.filter(i=>i.food&&i.g>0); if(!ok.length){toast('Нечего сохранять');return}
   if(V.mode==='recipe'){ RE.ings=RE.ings.concat(ok.map(i=>({n:i.food.n,g:R(i.g),k:i.food.k,p:i.food.p,f:i.food.f,c:i.food.c,m:i.food.m||microOf(i.food.n)||undefined}))); closeSheet(); openRecipe(); return }
   const L=S.days[cur]=day(cur).slice(); ok.forEach(i=>{ L.push({id:uid(),meal:i.meal,name:i.food.n,g:R(i.g),k:i.k,p:i.p,f:i.f,c:i.c,k100:i.food.k,p100:i.food.p,f100:i.food.f,c100:i.food.c,cat:i.food.cat||'',src:i.food.src||'',m100:i.food.m||undefined}); S.used[i.food.n]=(S.used[i.food.n]||0)+1 });
-  save(); dirty(); closeSheet(); render(); toast(`Записано: ${ok.length} · ${R(tot(ok).k)} ккал`); if(S.set.auto)speakSummary(ok) }
+  save(); dirty(); closeSheet(); render(); toast(`Записано: ${ok.length} · ${R(tot(ok).k)} ккал`) }
 // ---------- выбор продукта ----------
 let PK=null; // {cb, q}
-function openPicker(q,cb,alts){ PK={cb}; sheet(`<div class="sh"><h2>Выбор продукта</h2><button class="x" data-close2="1">✕</button></div><div class="row"><input id="pq" placeholder="Поиск: творог, борщ, сырники…" value="${esc(q||'')}"><button class="btn s" data-scan="1" title="Штрихкод">▥</button></div>
+function openPicker(q,cb,alts){ PK={cb}; sheet(`<div class="sh"><h2>Выбор продукта</h2><button class="x" data-close2="1">✕</button></div><div class="row"><input id="pq" placeholder="Поиск: творог, борщ, сырники…" value="${esc(q||'')}">${micBtn('pq','search')}<button class="btn s" data-scan="1" title="Штрихкод">▥</button></div>
   <div class="row" style="margin-top:6px"><button class="btn s sm" data-off="1">🌐 Open Food Facts</button><button class="btn s sm" data-custom="1">＋ Свой продукт</button></div><div id="pres"></div>`,2);
   showRes(alts&&alts.length&&!q?alts:null); if(!alts||!alts.length||q)showRes() }
-function resHtml(list){ return list.map((f,i)=>`<div class="res" data-pf="${i}"><div class="n"><div>${esc(f.n)}${f.src==='off'?' <span class="mu">OFF</span>':f.src==='recipe'?' <span class="mu">рецепт</span>':''}</div><div class="mu">${chips(f)}${f.pc?' · 1 шт ≈ '+f.pc+' г':''}</div></div><b>${R(f.k)}</b><span class="mu">/100 г</span></div>`).join('')||'<div class="empty">Ничего не найдено. Попробуй Open Food Facts или добавь свой продукт.</div>' }
+function resHtml(list){ return list.map((f,i)=>`<div class="res" data-pf="${i}"><div class="n"><div>${esc(f.n)}${f.src==='off'?' <span class="mu">OFF</span>':f.src==='recipe'?' <span class="mu">рецепт</span>':''}</div><div class="mu">${chips(f)}${f.pc?' · 1 шт ≈ '+f.pc+' г':''}</div></div><b>${R(f.k)}</b><span class="mu">/100 г</span><button class="inf" data-pinfo="${i}" aria-label="Состав">ⓘ</button></div>`).join('')||'<div class="empty">Ничего не найдено. Попробуй Open Food Facts или добавь свой продукт.</div>' }
 let PR=[]; function showRes(list){ const q=($('#pq')||{}).value||''; PR=list||(q.trim()?KP.search(index(),q,25).map(x=>x.food):[]); $('#pres').innerHTML=resHtml(PR) }
 function offMap(p){ const n=p.nutriments||{}, k=n['energy-kcal_100g']!=null?n['energy-kcal_100g']:(n.energy_100g||n['energy-kj_100g']||0)/4.184, br=Array.isArray(p.brands)?p.brands[0]:p.brands;
   const OM={A:['vitamin-a',1e6],D:['vitamin-d',1e6],E:['vitamin-e',1e3],K:['vitamin-k',1e6],C:['vitamin-c',1e3],B1:['vitamin-b1',1e6],B2:['vitamin-b2',1e6],B3:['vitamin-pp',1e3],B5:['pantothenic-acid',1e3],B6:['vitamin-b6',1e6],B7:['biotin',1e6],B9:['vitamin-b9',1e6],B12:['vitamin-b12',1e6],Ch:['choline',1e3],Ca:['calcium',1e3],P:['phosphorus',1e3],Mg:['magnesium',1e3],K_:['potassium',1e3],Na:['sodium',1e3],Fe:['iron',1e3],Zn:['zinc',1e3],Cu:['copper',1e6],Mn:['manganese',1e6],Se:['selenium',1e6],I:['iodine',1e6],Cr:['chromium',1e6],Fib:['fiber',1],Sug:['sugars',1],Chol:['cholesterol',1e3],O3:['omega-3-fat',1e3]};
@@ -224,7 +226,7 @@ function pickFood(f){ if(f.src==='off'&&!S.custom.some(c=>c.n===f.n)){S.custom.p
 // ---------- рецепт ----------
 let RE=null;
 function openRecipe(r){ if(r)RE=JSON.parse(JSON.stringify(r)); if(!RE)RE={id:uid(),name:'',ings:[],yield:0,servings:1,_new:true}; const n=recipeNut(RE), raw=RE.ings.reduce((a,i)=>a+i.g,0);
-  sheet(`<div class="sh"><h2>${RE._new?'Новый рецепт':'Рецепт'}</h2><button class="x" data-close="1">✕</button></div><label>Название (как будешь говорить)</label><input id="rn" value="${esc(RE.name)}" placeholder="мой плов">
+  sheet(`<div class="sh"><h2>${RE._new?'Новый рецепт':'Рецепт'}</h2><button class="x" data-close="1">✕</button></div><label>Название (как будешь говорить)</label><div class="row"><input id="rn" value="${esc(RE.name)}" placeholder="мой плов">${micBtn('rn','none')}</div>
   <h3>Ингредиенты</h3>${RE.ings.map((i,k)=>`<div class="it"><div class="n"><div>${esc(i.n)}</div><div class="mu">${R(i.k*i.g/100)} ккал</div></div><input style="width:80px" type="number" inputmode="numeric" data-rg="${k}" value="${R(i.g)}"><span class="mu">г</span><button data-rdel="${k}">✕</button></div>`).join('')||'<div class="mu">Пока пусто</div>'}
   <div class="row" style="margin-top:6px"><button class="btn s sp" data-radd="1">＋ Ингредиент</button><button class="btn s sp" data-rvoice="1">🎙️ Надиктовать</button></div>
   <div class="g2"><div><label>Выход готового блюда, г</label><input id="ry" type="number" inputmode="numeric" value="${R(RE.yield||raw)}"></div><div><label>Порций</label><input id="rs" type="number" inputmode="numeric" value="${RE.servings}"></div></div><div class="mu">Сырой вес ингредиентов: ${R(raw)} г. После варки/жарки взвесь готовое блюдо.</div>
@@ -232,7 +234,24 @@ function openRecipe(r){ if(r)RE=JSON.parse(JSON.stringify(r)); if(!RE)RE={id:uid
   <div class="row"><button class="btn sp" data-rsave="1">Сохранить</button>${RE._new?'':'<button class="btn r" data-rremove="1">Удалить</button>'}</div>`) }
 function syncRecipe(){ const n=$('#rn'); if(!n)return; RE.name=n.value.trim(); RE.yield=+$('#ry').value||0; RE.servings=Math.max(1,+$('#rs').value||1); document.querySelectorAll('[data-rg]').forEach(x=>RE.ings[+x.dataset.rg].g=+x.value||0) }
 // ---------- запись ----------
-function openEntry(e){ sheet(`<div class="sh"><h2>${esc(e.name)}</h2><button class="x" data-close="1">✕</button></div><div class="g2"><div><label>Граммы</label><input id="eg" type="number" inputmode="numeric" value="${R(e.g)}"></div><div><label>Приём пищи</label><select id="em">${MEALS.map(m=>`<option ${e.meal===m?'selected':''}>${m}</option>`).join('')}</select></div></div>
+// Детали порции: КБЖУ, клетчатка, сахара, все витамины/минералы с % нормы
+function detailHtml(name,g,f100,m100){ const nm=MICROS.norms(S.prof), k=MK, n=KP.nutr(f100,g), m=m100||microOf(name);
+  const row=d=>{ const i=k.indexOf(d.k); if(i<0||!m)return ''; const a=(+m[i]||0)*g/100, p=d.norm?a/d.norm*100:0, st=d.t==='lim'?(a>(d.ul||d.norm)?'over':''):(d.ul&&a>d.ul?'over':'');
+    return `<div class="dr ${st}"><span>${esc(d.n)}</span><b>${R(a)} ${d.u}</b><span class="mp">${R(p)}%</span></div>` };
+  const fib=nm.find(d=>d.k==='Fib'), sug=nm.find(d=>d.k==='Sug'), iF=k.indexOf('Fib'), iS=k.indexOf('Sug');
+  return `<div class="dk"><div><b>${R(n.k)}</b><span>ккал</span></div><div class="cP"><b>${R(n.p)}</b><span>белки</span></div><div class="cF"><b>${R(n.f)}</b><span>жиры</span></div><div class="cC"><b>${R(n.c)}</b><span>углев.</span></div>
+   <div><b>${m?R((+m[iF]||0)*g/100):'—'}</b><span>клетч.</span></div><div><b>${m?R((+m[iS]||0)*g/100):'—'}</b><span>сахара</span></div></div>
+   <div class="mu" style="margin:2px 0 4px">${R(f100.k)} ккал на 100 г · % — от дневной нормы (${R(n.k/Math.max(1,S.goals.k)*100)}% калорий)</div>
+   ${m?`<div class="dgrid">${nm.filter(d=>d.k!=='Fib'&&d.k!=='Sug').map(row).join('')}</div>`:'<div class="mu">Для этого продукта нет данных о витаминах и минералах.</div>'}` }
+let DT=null; // {name,f100,m100,g,mode,id}
+function openDetail(o){ DT=o; const isE=o.mode==='entry';
+  sheet(`<div class="sh"><h2 style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(o.name)}</h2><button class="x" data-close${isE?'':'2'}="1">✕</button></div>
+  <div class="row"><div style="width:96px"><input id="dg" type="number" inputmode="numeric" value="${R(o.g)}" aria-label="Граммы"></div><span class="mu">г</span>
+   ${isE||o.mode==='add'?`<select id="dm" class="sp">${MEALS.map(m=>`<option ${o.meal===m?'selected':''}>${m}</option>`).join('')}</select>`:'<span class="sp"></span>'}</div>
+  <div id="dbody" style="margin-top:6px">${detailHtml(o.name,o.g,o.f100,o.m100)}</div>
+  <div class="row" style="margin-top:8px">${isE?`<button class="btn sp" data-esave="${o.id}">Сохранить</button><button class="btn s" data-ecopy="${o.id}">На сегодня</button><button class="btn r" data-edel="${o.id}">Удалить</button>`:o.mode==='add'?`<button class="btn sp" data-dadd="1">＋ В дневник</button>`:o.mode==='pick'?`<button class="btn sp" data-dpick="1">Выбрать</button>`:''}</div>`,isE?1:2) }
+function openEntry(e){ openDetail({mode:'entry',id:e.id,name:e.name,g:e.g,meal:e.meal,f100:{k:e.k100,p:e.p100,f:e.f100,c:e.c100},m100:e.m100}) }
+function openEntryOld(e){ sheet(`<div class="sh"><h2>${esc(e.name)}</h2><button class="x" data-close="1">✕</button></div><div class="g2"><div><label>Граммы</label><input id="eg" type="number" inputmode="numeric" value="${R(e.g)}"></div><div><label>Приём пищи</label><select id="em">${MEALS.map(m=>`<option ${e.meal===m?'selected':''}>${m}</option>`).join('')}</select></div></div>
   <div class="mu" style="margin:6px 0">на 100 г: ${R(e.k100)} ккал · Б ${R(e.p100)} · Ж ${R(e.f100)} · У ${R(e.c100)}</div><div class="row"><button class="btn sp" data-esave="${e.id}">Сохранить</button><button class="btn s" data-ecopy="${e.id}">На сегодня</button><button class="btn r" data-edel="${e.id}">Удалить</button></div>`) }
 function addEntry(f,g,meal){ const n=KP.nutr(f,g); (S.days[cur]=day(cur).slice()).push({id:uid(),meal,name:f.n,g:R(g),k:n.k,p:n.p,f:n.f,c:n.c,k100:f.k,p100:f.p,f100:f.f,c100:f.c,cat:f.cat||'',src:f.src||'',m100:f.m||undefined}); S.used[f.n]=(S.used[f.n]||0)+1; save(); dirty() }
 // ---------- события ----------
@@ -241,18 +260,20 @@ document.addEventListener('click',e=>{ const mr=e.target.closest('[data-mic]'); 
   if(t.classList.contains('sheet')){ if(e.target===t)closeSheet(t.id==='sheet2'?2:1); return }
   if(d.tab){tab=d.tab;render();return} if(d.sm){statMode=d.sm;render();return}
   if(t.id==='prev'||t.id==='next'){cur=addD(cur,t.id==='prev'?-1:1);render();return}
-  if(t.id==='say'){ const a=tab==='stats'?lastAdv.stat:lastAdv.day||advice(day(cur),S.goals,{}); const tt=tot(day(cur)); speak((tab==='stats'&&statMode!=='day'?'':`За ${cur===dk()?'сегодня':'день'} ${R(tt.k)} ккал из ${S.goals.k}. Белки ${R(tt.p)}, жиры ${R(tt.f)}, углеводы ${R(tt.c)} г. `)+(a||[]).map(x=>x[1]).join(' ')); return }
-  if(d.say){ speak((lastAdv[d.say]||[]).map(x=>x[1]).join(' ')); return }
   if(t.id==='fab'){openVoice();return} if(d.addm){openVoice(d.addm);return}
   if(d.close){closeSheet();return} if(d.close2){scanStop&&scanStop();closeSheet(2);return}
-  if(t.id==='mic'){startRec();return} if(t.id==='vparse'){ const v=$('#vt').value; if(v.trim()){V.items=[];doParse(v)} return }
+  if(d.mict){ const act=d.mica; micStart(d.mict,t,v=>{ if(act==='parse'){ if(v){V.items=[];doParse(v)} } else if(act==='search'){ showRes() } }); return } if(t.id==='vparse'){ const v=$('#vt').value; if(v.trim()){V.items=[];doParse(v)} return }
   if(d.idel){V.items.splice(+d.idel,1);renderItems();return}
   if(d.pick){ const i=+d.pick, it=V.items[i]; openPicker(it.food?'':it.text,f=>{it.food=f; if(!it.num&&!it.unit)it.g=KP.grams(f,null,null,1); recalc(it); renderItems()},it.alts); return }
-  if(d.vsave){saveVoice();return} if(d.vsay){ const tt=tot(V.items.filter(i=>i.food)); speak(V.items.filter(i=>i.food).map(i=>`${i.food.n} ${R(i.g)} г`).join(', ')+`. Итого ${R(tt.k)} ккал, белки ${R(tt.p)}, жиры ${R(tt.f)}, углеводы ${R(tt.c)} г.`); return }
+  if(d.vsave){saveVoice();return}
+  if(d.pinfo!=null){ const f=PR[+d.pinfo]; openDetail({mode:'pick',name:f.n,g:f.pc&&f.pc<=250?f.pc:(f.po||100),f100:f,m100:f.m,food:f}); return }
+  if(d.dpick){ const f=DT.food; closeSheet(2); pickFood(f); return }
+  if(d.recinfo){ const r=S.recipes.find(x=>x.id===d.recinfo), n=recipeNut(r); openDetail({mode:'add',name:r.name,g:R(r.yield/Math.max(1,r.servings)),meal:KP.defaultMeal(),f100:n,m100:n.m,food:Object.assign({},n,{n:r.name,src:'recipe'})}); return }
+  if(d.dadd){ const g=+$('#dg').value||DT.g; addEntry(DT.food,g,$('#dm').value); closeSheet(2); cur=dk(); tab='diary'; render(); toast(`${DT.name}: ${R(g)} г`); return }
   if(d.pf!=null){ pickFood(PR[+d.pf]); return } if(d.off){offSearch();return} if(d.scan){scan();return} if(d.scanstop){scanStop&&scanStop();showRes();return} if(d.custom){customForm();return}
   if(d.csave){ const f={n:$('#cn').value.trim(),k:+$('#ck').value||0,p:+$('#cp').value||0,f:+$('#cf').value||0,c:+$('#cc').value||0,po:+$('#cpo').value||100,src:'custom'}; if(!f.n)return toast('Введите название'); S.custom.push(f); save(); dirty(); pickFood(f); return }
   if(d.edit){ const en=day(cur).find(x=>x.id===d.edit); if(en)openEntry(en); return }
-  if(d.esave){ const en=day(cur).find(x=>x.id===d.esave); en.g=+$('#eg').value||en.g; en.meal=$('#em').value; Object.assign(en,KP.nutr({k:en.k100,p:en.p100,f:en.f100,c:en.c100},en.g)); save(); closeSheet(); render(); return }
+  if(d.esave){ const en=day(cur).find(x=>x.id===d.esave); en.g=+$('#dg').value||en.g; en.meal=$('#dm').value; Object.assign(en,KP.nutr({k:en.k100,p:en.p100,f:en.f100,c:en.c100},en.g)); save(); closeSheet(); render(); return }
   if(d.edel){ S.days[cur]=day(cur).filter(x=>x.id!==d.edel); save(); closeSheet(); render(); toast('Удалено'); return }
   if(d.ecopy){ const en=day(cur).find(x=>x.id===d.ecopy); const k=dk(); (S.days[k]=day(k).slice()).push(Object.assign({},en,{id:uid()})); save(); closeSheet(); render(); toast('Добавлено на сегодня'); return }
   if(d.water){ S.water[cur]=Math.max(0,(S.water[cur]||0)+ +d.water); save(); render(); return }
@@ -273,10 +294,11 @@ document.addEventListener('click',e=>{ const mr=e.target.closest('[data-mic]'); 
 function readProf(){ const p=S.prof; p.sex=$('#cs').value; p.a=+$('#ca').value||p.a; p.w=+$('#cw').value||p.w; p.h=+$('#ch').value||p.h; p.act=+$('#cact').value; p.goal=$('#cg').value }
 document.addEventListener('input',e=>{ const t=e.target,d=t.dataset;
   if(d.ig!=null){ const it=V.items[+d.ig]; it.g=+t.value||0; recalc(it); const top=t.closest('.pi').querySelector('.top b'); if(top&&it.food)top.textContent=R(it.k)+' ккал'; const cm=t.closest('.pi').querySelector('.mu[style]'); if(cm&&it.food)cm.innerHTML=chips(it)+' <span>«'+esc(it.raw)+'»</span>'; const tt=tot(V.items.filter(i=>i.food)), kv=$('#vres .card .kv span:last-child'); if(kv)kv.innerHTML='<b>'+R(tt.k)+'</b> ккал · '+chips(tt); return }
+  if(t.id==='dg'&&DT){ DT.g=+t.value||0; $('#dbody').innerHTML=detailHtml(DT.name,DT.g,DT.f100,DT.m100); return }
   if(t.id==='pq'){ clearTimeout(showRes.t); showRes.t=setTimeout(()=>showRes(),120); return }
   if(['cs','ca','cw','ch','cact','cg'].includes(t.id)){ readProf(); save(); $('#calc').innerHTML=calcHtml(mifflin(S.prof)); return }
   if(/^g[kpfc]$/.test(t.id)){ const k=+$('#gk').value,s=(+$('#gp').value)*4+(+$('#gf').value)*9+(+$('#gc').value)*4; $('#gsum').textContent=`Б/Ж/У дают ${R(s)} ккал (${k?R(s/k*100):0}% от цели)`; return }
-  if(t.id==='sauto'){S.set.auto=t.checked;save();return} if(t.id==='swater'){S.set.water=t.checked;save();return}
+  if(t.id==='swater'){S.set.water=t.checked;save();return}
 });
 document.addEventListener('toggle',e=>{ const t=e.target; if(!t.classList)return; if(t.classList.contains('nutri')){S.set.nutriOpen=t.open;save()} else if(t.dataset&&t.dataset.k){S.set[t.dataset.k]=t.open;save()} },true);
 document.addEventListener('change',e=>{ const t=e.target,d=t.dataset; if(d.imeal!=null){V.items[+d.imeal].meal=t.value;return}

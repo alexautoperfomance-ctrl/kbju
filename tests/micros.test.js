@@ -35,6 +35,6 @@ as(M.acc('скумбрия')==='скумбрию'&&M.acc('капуста брю�
 a=M.analyze([[E('макароны',300),E('сосиски',150)]],{sex:'m',a:35},K,lk);
 const r=N.analyze({days:[{key:'d',entries:[E('макароны',300),E('сосиски',150)],water:0}],goals:{k:2200,p:140,f:70,c:240,w:2000},prof:{w:80,goal:'keep'},mode:'day',micro:a.list,microAdvice:d=>M.gapAdvice(d,self.FOODS,K,self.MICRO)});
 as(r.metrics.microDef.length>=3&&r.metrics.microDef.every(d=>/добавь/.test(d.t)),'нутрициолог: дефициты с советами');
-as(r.plan.some(p=>/^Для .+: добавь/.test(p)),'дефициты в плане на завтра'); as(/Не хватает: .*процентов нормы/.test(r.speech),'дефициты в озвучке');
+as(r.plan.some(p=>/^Для .+: добавь/.test(p)),'дефициты в плане на завтра');
 as(![...r.metrics.microDef.map(d=>d.t),...r.plan].some(t=>/\d[.,]\d/.test(t.replace(/\d+%/g,''))),'только целые числа');
 console.log(`\n${ok} passed, ${bad} failed`); process.exit(bad?1:0);

@@ -4,7 +4,7 @@ const E=(n,g,meal)=>{const f=F(n); if(!f)throw new Error('нет '+n); return {n
 const goals={k:2200,p:140,f:70,c:240,w:2000}, prof={w:80,goal:'keep'};
 let ok=0,bad=0; const as=(c,m)=>{if(c)ok++;else{bad++;console.log('FAIL:',m)}};
 const days=(n,fn)=>Array.from({length:n},(_,i)=>({key:'d'+i,entries:fn(i),water:1000}));
-const noDigitsFrac=r=>![...r.strengths,...r.problems].some(x=>/\d[.,]\d/.test(x.t+(x.swap||'')))&&!r.plan.some(x=>/\d[.,]\d/.test(x.replace(/\d+%/g,'')))&&!/\d[.,]\d/.test(r.speech.replace(/10%/g,''));
+const noDigitsFrac=r=>![...r.strengths,...r.problems].some(x=>/\d[.,]\d/.test(x.t+(x.swap||'')))&&!r.plan.some(x=>/\d[.,]\d/.test(x.replace(/\d+%/g,'')));
 // 1. пустой
 let r=N.analyze({days:days(1,()=>[]),goals,prof,mode:'day'}); as(r.empty&&r.plan.length,'пустой день');
 // 2. плохой рацион: фастфуд, майонез, сладкое, без завтрака, алкоголь
@@ -16,7 +16,6 @@ as(r.problems.some(p=>/Профицит|вес будет расти/.test(p.t))
 as(r.metrics.alcoK>300&&r.metrics.upf>25&&r.metrics.sugar>50&&r.metrics.noBreakfast===7,'алкоголь/UPF/сахар/завтрак');
 as(r.metrics.wkg>0.3,'прогноз набора веса');
 as(noDigitsFrac(r),'только целые числа');
-as(/Оценка \d+ из 10/.test(r.speech),'озвучка с оценкой');
 as(r.plan.length>=3&&/Цель/.test(r.plan[0]),'план на завтра');
 const sw=r.problems.map(p=>p.swap).join(' ');
 // 3. хороший рацион

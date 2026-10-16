@@ -27,7 +27,7 @@ function swapFor(top,days){ // top: [{n,k,g,f}] средние за день
   return null }
 function agg(list,key){ const m={}; list.forEach(e=>{const x=m[e.name]||(m[e.name]={n:e.name,k:0,f:0,g:0,c:0,cnt:0});x.k+=e.k;x.f+=e.f;x.g+=e.g;x.c+=e.c;x.cnt++}); return Object.values(m).sort((a,b)=>b[key]-a[key]) }
 function analyze(o){ const g=o.goals, w=(o.prof&&o.prof.w)||70, keys=o.days.map(d=>d.key), logged=o.days.filter(d=>d.entries.length), N=Math.max(1,logged.length), P=o.days.length;
-  if(!logged.length) return {empty:true,score:0,strengths:[],problems:[],plan:['Записывай всё, что ешь, хотя бы 3 дня — тогда я смогу дать разбор.'],speech:'Пока нет данных для анализа.'};
+  if(!logged.length) return {empty:true,score:0,strengths:[],problems:[],plan:['Записывай всё, что ешь, хотя бы 3 дня — тогда я смогу дать разбор.']};
   const all=logged.flatMap(d=>d.entries), S=k=>all.reduce((a,e)=>a+(+e[k]||0),0)/N;
   const m={k:S('k'),p:S('p'),f:S('f'),c:S('c')}; m.pkg=m.p/w; const kc=m.p*4+m.f*9+m.c*4||1; m.pct={p:m.p*4/kc*100,f:m.f*9/kc*100,c:m.c*4/kc*100};
   const gk=g.p*4+g.f*9+g.c*4||1; m.gpct={p:g.p*4/gk*100,f:g.f*9/gk*100,c:g.c*4/gk*100};
@@ -86,9 +86,7 @@ function analyze(o){ const g=o.goals, w=(o.prof&&o.prof.w)||70, keys=o.days.map(
   m.microDef.slice(0,2).forEach(d=>plan.push(d.t.replace(/^(.*?) \d+% нормы — добавь/,'Для $1: добавь')+'.'));
   if(plan.length<4) plan.push('Овощи в каждый основной приём — минимум 400 г за день.');
   if(m.water!=null&&plan.length<5) plan.push(`Вода — ${g.w} мл.`);
-  const label=o.mode==='day'?'за день':o.mode==='week'?'за неделю':'за месяц';
-  const speech=`Разбор ${label}. Оценка ${score} из 10. `+(good[0]?'Хорошо: '+good.slice(0,2).map(x=>x.t).join(' '):'')+(bad[0]?' Главное исправить: '+bad[0].t+' Совет: '+bad[0].swap+'.':'')+(m.microDef.length?' Не хватает: '+m.microDef.slice(0,3).map(d=>d.n+' '+d.pct+' процентов нормы').join(', ')+'. '+m.microDef[0].t.split(' — ')[1]+'.':'')+' План на завтра: '+plan.slice(1,3).join(' ');
-  return {score,strengths:good.slice(0,3),problems:bad.slice(0,3),plan:plan.slice(0,6),metrics:m,speech,tdee} }
+  return {score,strengths:good.slice(0,3),problems:bad.slice(0,3),plan:plan.slice(0,6),metrics:m,tdee} }
 const grams=kg=>kg>=.95?R(kg)+' кг':R(kg*1000/50)*50+' г'; const cap=s=>s[0].toUpperCase()+s.slice(1);
 const N={analyze,fiber100,RX};
 if(typeof module!=='undefined'&&module.exports)module.exports=N; else G.NUTRI=N;

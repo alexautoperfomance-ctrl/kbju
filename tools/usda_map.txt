@@ -419,3 +419,5 @@
 спринг ролл=egg rolls pork refrigerated heated
 луковые кольца=fast foods onion rings breaded and fried
 холодец=gelatins dry powder unsweetened
+
+маракуйя=passion-fruit (granadilla) purple raw

@@ -60,8 +60,12 @@ details.col>summary{list-style:none;cursor:pointer;min-height:36px}details.col>s
 .mr{display:grid;grid-template-columns:118px 1fr 74px 38px;gap:6px;align-items:center;min-height:30px;font-size:.8rem;border-top:1px solid #f2f4f3;cursor:pointer}.mr .mn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mr .mb{height:6px;background:#eef1ef;border-radius:4px;overflow:hidden}.mr .mb i{display:block;height:100%;background:var(--g);border-radius:4px}.mr .ma{text-align:right;color:var(--mu);font-size:.74rem;white-space:nowrap}.mr .mp{text-align:right;font-weight:600}
 .mr.low .mb i{background:var(--F)}.mr.low .mp{color:#b45309}.mr.over .mb i{background:var(--red)}.mr.over .mp{color:var(--red)}.cR{background:#fde8e8;color:var(--red)}
+.micb{border:0;background:var(--g2);border-radius:10px;min-width:40px;height:38px;font-size:1.05rem;flex:0 0 auto}.micb.on,.mic.on{background:var(--red)!important;color:#fff;animation:pulse 1.2s infinite}
+.inf{border:0;background:none;color:var(--g);font-size:1.15rem;min-width:36px;min-height:36px}
+.dk{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;text-align:center}.dk>div{background:#fff;border-radius:9px;padding:4px 0}.dk b{display:block;font-size:1rem}.dk span{font-size:.66rem;color:var(--mu)}.dk .cP,.dk .cF,.dk .cC{border-radius:9px}
+.dgrid{display:grid;grid-template-columns:1fr 1fr;column-gap:10px;background:#fff;border-radius:10px;padding:2px 8px}.dr{display:grid;grid-template-columns:1fr auto 34px;gap:4px;font-size:.74rem;padding:3px 0;border-bottom:1px solid #f2f4f3;align-items:center}.dr span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.dr b{font-weight:600;white-space:nowrap}.dr .mp{text-align:right;color:var(--mu)}.dr.over b,.dr.over .mp{color:var(--red)}
 </style></head><body>
-<header><button id="prev" aria-label="Предыдущий день">‹</button><div class="d" id="dlabel"></div><button id="next" aria-label="Следующий день">›</button><button id="say" title="Озвучить">🔊</button><span id="ver"></span></header>
+<header><button id="prev" aria-label="Предыдущий день">‹</button><div class="d" id="dlabel"></div><button id="next" aria-label="Следующий день">›</button><span id="ver"></span></header>
 <main id="app"></main>
 <button id="fab" aria-label="Сказать, что съел">🎙️</button>
 <nav id="nav"></nav>

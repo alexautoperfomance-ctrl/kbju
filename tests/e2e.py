@@ -1,11 +1,20 @@
-import asyncio,json,random,datetime,sys
+# Playwright e2e, 440x956. Распознавание речи замокано (continuous + interim, iOS-подобные onend), TTS запрещён.
+import asyncio,sys,re
 from playwright.async_api import async_playwright
 URL=sys.argv[1] if len(sys.argv)>1 else 'http://127.0.0.1:18437/'
 FAKE='''
-window.__said=[];window.__tts=[];
-class FakeSR{constructor(){this.lang='';}start(){const t=window.__nextTranscript||'';setTimeout(()=>{this.onresult&&this.onresult({results:[Object.assign([{transcript:t}],{isFinal:true})]});setTimeout(()=>this.onend&&this.onend(),50)},200)}stop(){this.onend&&this.onend()}}
-window.webkitSpeechRecognition=FakeSR;window.SpeechRecognition=FakeSR;
-const _s=speechSynthesis.speak.bind(speechSynthesis);speechSynthesis.speak=u=>{window.__tts.push(u.text)};
+window.__tts=0; window.__sr={created:0,started:0,stopped:0};
+window.__chunks=[]; // фразы, которые «говорит» пользователь, по одной на сессию распознавания
+class FakeSR{constructor(){window.__sr.created++;this.continuous=false;this.interimResults=false}
+ start(){window.__sr.started++; window.__sr.cfg=[this.continuous,this.interimResults,this.lang]; const t=window.__chunks.shift(); this._alive=true;
+  if(t==null){ this._t=setTimeout(()=>this._end(),300); return }
+  this._t1=setTimeout(()=>this._alive&&this.onresult&&this.onresult({resultIndex:0,results:[Object.assign([{transcript:t.slice(0,Math.ceil(t.length/2))}],{isFinal:false})]}),80);
+  this._t2=setTimeout(()=>this._alive&&this.onresult&&this.onresult({resultIndex:0,results:[Object.assign([{transcript:t}],{isFinal:true})]}),180);
+  this._t=setTimeout(()=>this._end(),300) /* как iOS: сессия сама заканчивается */ }
+ _end(){ if(!this._alive)return; this._alive=false; clearTimeout(this._t); setTimeout(()=>this.onend&&this.onend(),10) }
+ stop(){ window.__sr.stopped++; this._end() } abort(){ this._end() }}
+window.webkitSpeechRecognition=FakeSR; window.SpeechRecognition=FakeSR;
+if(window.speechSynthesis){ speechSynthesis.speak=()=>{window.__tts++} }
 '''
 async def main():
   errs=[]
@@ -14,67 +23,78 @@ async def main():
     await c.add_init_script(FAKE); pg=await c.new_page()
     pg.on('console',lambda m: m.type=='error' and errs.append(m.text)); pg.on('pageerror',lambda e: errs.append(str(e)))
     await pg.goto(URL); await pg.wait_for_selector('#nav button')
-    assert 'v1.3.0' in await pg.inner_text('#ver')
-    # голос: завтрак+обед
-    await pg.evaluate("window.__nextTranscript='на завтрак два яйца и кофе с молоком, на обед 200 грамм гречки и куриная грудка'")
-    await pg.click('#fab'); await pg.wait_for_selector('.pi'); await pg.wait_for_timeout(300)
+    assert 'v1.4.0' in await pg.inner_text('#ver')
+    assert await pg.locator('text=🔊').count()==0, 'нет кнопок озвучки'
+    # --- микрофон-переключатель: 3 сессии (iOS-рестарты) до нажатия «стоп»
+    await pg.evaluate("window.__chunks=['на завтрак два яйца','и кофе с молоком','на обед 200 грамм гречки и куриная грудка']")
+    await pg.click('#fab'); await pg.wait_for_selector('#mic')
+    assert await pg.evaluate('window.__sr.started')==0, 'не стартует сам'
+    await pg.click('#mic'); await pg.wait_for_timeout(150)
+    assert 'on' in (await pg.get_attribute('#mic','class')), 'активное состояние'
+    await pg.wait_for_timeout(1300)
+    st=await pg.evaluate('window.__sr'); print('sr',st); assert st['started']>=3 and st['cfg'][0] and st['cfg'][1] and st['cfg'][2]=='ru-RU'
+    assert await pg.locator('.pi').count()==0, 'до стопа не разбираем'
+    vt=await pg.input_value('#vt'); print('vt:',vt); assert 'два яйца' in vt and 'кофе с молоком' in vt and 'гречки' in vt
+    await pg.click('#mic'); await pg.wait_for_selector('.pi'); await pg.wait_for_timeout(200)
+    assert 'on' not in (await pg.get_attribute('#mic','class') or '')
     names=await pg.eval_on_selector_all('.pi .nm','e=>e.map(x=>x.textContent)'); print('voice items',names); assert len(names)==4
-    # правка граммов
+    n=await pg.evaluate('window.__sr.started'); await pg.wait_for_timeout(700); assert await pg.evaluate('window.__sr.started')==n, 'после стопа не перезапускается'
     await pg.fill('[data-ig="3"]','150'); await pg.dispatch_event('[data-ig="3"]','input')
     await pg.screenshot(path='shots/voice-confirm.png')
     await pg.click('[data-vsave]'); await pg.wait_for_timeout(300)
-    tts=await pg.evaluate('window.__tts'); print('tts',tts[-1][:120]); assert tts
-    # текстовый путь (как диктовка iOS)
-    await pg.click('[data-addm="ужин"]'); await pg.wait_for_timeout(500); await pg.wait_for_selector('#vt')
-    await pg.fill('#vt','тарелку борща со сметаной, два куска черного хлеба и чай с сахаром'); await pg.click('#vparse'); await pg.wait_for_selector('.pi')
+    # --- клавиатурная диктовка (как на iOS) + маракуйя
+    await pg.click('[data-addm="ужин"]'); await pg.wait_for_selector('#vt')
+    await pg.fill('#vt','тарелку борща со сметаной, два куска черного хлеба и маракуйя 200 г'); await pg.click('#vparse'); await pg.wait_for_selector('.pi')
     print('text items',await pg.eval_on_selector_all('.pi .nm','e=>e.map(x=>x.textContent)'))
     await pg.click('[data-vsave]'); await pg.wait_for_timeout(300)
     await pg.click('[data-water="250"]'); await pg.click('[data-water="250"]')
-    await pg.screenshot(path='shots/diary.png',full_page=False)
-    # правка записи
-    await pg.click('.it'); await pg.fill('#eg','120'); await pg.click('[data-esave]')
-    # рецепт голосом
-    await pg.click('[data-tab="recipes"]'); await pg.evaluate("window.__nextTranscript='500 грамм риса сухого, 400 грамм говядины, две моркови, луковица и три ложки подсолнечного масла'")
-    await pg.click('[data-newrec="voice"]'); await pg.wait_for_selector('.pi'); await pg.wait_for_timeout(300)
+    await pg.screenshot(path='shots/diary-compact.png'); await pg.screenshot(path='shots/diary.png')
+    # --- детали записи
+    await pg.click('.it:has-text("маракуйя")'); await pg.wait_for_selector('#dbody .dgrid')
+    dt=await pg.inner_text('#sbody'); print('detail:',dt[:300].replace('\n',' | '))
+    assert 'Витамин C' in dt and 'Калий' in dt and 'клетч' in dt and 'сахара' in dt and '%' in dt
+    assert not re.search(r'\d[.,]\d',dt.replace('2,5','')), 'целые числа'
+    rows=await pg.locator('#dbody .dr').count(); print('detail rows',rows); assert rows>=26
+    await pg.wait_for_timeout(2700); await pg.screenshot(path='shots/entry-detail.png')
+    k1=(await pg.inner_text('.dk div >> nth=0')); await pg.fill('#dg','100'); await pg.dispatch_event('#dg','input'); k2=await pg.inner_text('.dk div >> nth=0'); print('kcal 200→100 g:',k1.split()[0],k2.split()[0]); assert int(k2.split()[0])<int(k1.split()[0])
+    await pg.select_option('#dm','перекус'); await pg.click('[data-esave]'); await pg.wait_for_timeout(200)
+    S=await pg.evaluate('window.__kbju.S'); e=[x for d in S['days'].values() for x in d if x['name']=='маракуйя'][0]; print('edited',e['g'],e['meal']); assert e['g']==100 and e['meal']=='перекус'
+    await pg.click('.it:has-text("маракуйя")'); await pg.click('[data-edel]'); await pg.wait_for_timeout(200); assert await pg.locator('.it:has-text("маракуйя")').count()==0
+    # --- поиск: микрофон в поле поиска + детали из результатов
+    await pg.click('[data-addm="перекус"]'); await pg.wait_for_selector('#vt'); await pg.fill('#vt','сырок'); await pg.click('#vparse'); await pg.wait_for_selector('.pi'); await pg.click('[data-pick="0"]')
+    await pg.wait_for_selector('#sheet2.on'); await pg.fill('#pq',''); await pg.evaluate("window.__chunks=['творог']"); await pg.click('[data-mict="pq"]'); await pg.wait_for_timeout(250)
+    assert 'on' in await pg.get_attribute('[data-mict="pq"]','class'); await pg.click('[data-mict="pq"]'); await pg.wait_for_timeout(400)
+    print('search by voice:',await pg.input_value('#pq'),await pg.locator('#pres .res').count()); assert 'творог' in await pg.input_value('#pq') and await pg.locator('#pres .res').count()>0
+    await pg.click('[data-pinfo="0"]'); await pg.wait_for_selector('#dbody .dgrid'); print('search detail ok'); await pg.click('[data-dpick]'); await pg.wait_for_timeout(200)
+    await pg.click('[data-close]')
+    # --- рецепт голосом (переключатель) + детали порции рецепта
+    await pg.click('[data-tab="recipes"]'); await pg.click('[data-newrec="voice"]'); await pg.wait_for_selector('#mic')
+    await pg.evaluate("window.__chunks=['500 грамм риса сухого, 400 грамм говядины','две моркови, луковица и три ложки подсолнечного масла']")
+    await pg.click('#mic'); await pg.wait_for_timeout(900); await pg.click('#mic'); await pg.wait_for_selector('.pi'); await pg.wait_for_timeout(200)
     print('recipe ings',await pg.eval_on_selector_all('.pi .nm','e=>e.map(x=>x.textContent)'))
     await pg.click('[data-vsave]'); await pg.wait_for_selector('#rn'); await pg.fill('#rn','мой плов'); await pg.fill('#ry','1800'); await pg.fill('#rs','6'); await pg.click('[data-rsave]'); await pg.wait_for_timeout(200)
-    await pg.screenshot(path='shots/recipes.png',full_page=False)
-    # рецепт по имени голосом
-    await pg.evaluate("window.__nextTranscript='на перекус мой плов 300 грамм'"); await pg.click('#fab'); await pg.wait_for_selector('.pi'); await pg.wait_for_timeout(300)
-    n=await pg.eval_on_selector_all('.pi .nm','e=>e.map(x=>x.textContent)'); print('recipe by voice',n); assert 'мой плов' in n[0]
-    await pg.click('[data-vsave]'); await pg.wait_for_timeout(200)
-    # цели
-    await pg.click('[data-tab="goals"]'); await pg.fill('#cw','92'); await pg.dispatch_event('#cw','input'); await pg.click('[data-applycalc]')
-    g=await pg.evaluate('window.__kbju.S.goals'); print('goals',g)
-    await pg.screenshot(path='shots/goals.png',full_page=False)
-    await pg.evaluate('window.scrollTo(0,0)'); await pg.click('[data-tab="diary"]'); await pg.wait_for_timeout(100); await pg.screenshot(path='shots/diary-compact.png')
-    vis=await pg.evaluate("(()=>{const m=[...document.querySelectorAll('.meal')];const last=m[m.length-1].getBoundingClientRect();return [last.bottom, innerHeight, document.querySelector('#fab').getBoundingClientRect().top]})()"); print('diary last-meal bottom / viewport',vis)
-    # история для статистики (только в тесте)
+    await pg.screenshot(path='shots/recipes.png')
+    await pg.click('[data-recinfo]'); await pg.wait_for_selector('#dbody .dgrid'); rd=await pg.inner_text('#sbody2'); assert 'Витамин A' in rd; print('recipe detail ok')
+    await pg.click('[data-dadd]'); await pg.wait_for_timeout(200)
+    await pg.click('[data-tab="goals"]'); await pg.fill('#cw','92'); await pg.dispatch_event('#cw','input'); await pg.click('[data-applycalc]'); await pg.screenshot(path='shots/goals.png')
+    # история только для статистики в тесте
     await pg.evaluate('''()=>{const S=window.__kbju.S;const F=self.FOODS;const pick=n=>F.find(f=>f.n===n);const L=['гречка','куриная грудка отварная','творог 5%','банан','борщ','пельмени','салат оливье','кофе с молоком','хлеб черный','шоколад молочный','яйцо','плов'];
       for(let i=1;i<30;i++){const d=new Date();d.setDate(d.getDate()-i);const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');if(i%9===0)continue;
        S.days[k]=[];for(let j=0;j<5+(i%4);j++){const f=pick(L[(i*7+j*5)%L.length]);const g=f.po||150;S.days[k].push({id:'t'+i+j,meal:['завтрак','обед','ужин','перекус'][j%4],name:f.n,g,k:Math.round(f.k*g/100),p:f.p*g/100,f:f.f*g/100,c:f.c*g/100,k100:f.k,p100:f.p,f100:f.f,c100:f.c,cat:f.cat})}}
       localStorage.setItem('kbju.v1',JSON.stringify(S))}''')
     await pg.reload(); await pg.wait_for_selector('#nav button')
-    await pg.click('[data-tab="stats"]'); await pg.screenshot(path='shots/stats-day.png',full_page=False)
-    await pg.click('[data-sm="week"]'); await pg.wait_for_timeout(100); await pg.screenshot(path='shots/stats.png',full_page=False); await pg.screenshot(path='shots/stats-compact.png'); await pg.evaluate('window.scrollTo(0,600)'); await pg.screenshot(path='shots/stats-week-bottom.png')
-    await pg.click('details.nutri summary h2'); await pg.evaluate("document.querySelector('details.nutri').scrollIntoView();window.scrollBy(0,-62)"); await pg.wait_for_timeout(100); await pg.screenshot(path='shots/nutritionist.png')
-    nt=await pg.inner_text('details.nutri'); print('nutri week:',nt[:400].replace('\n',' | ')); assert '/10' in nt and 'не медицинская' in nt
-    await pg.click('[data-say="nutri"]'); print('nutri tts:',(await pg.evaluate('window.__tts'))[-1][:160])
-    await pg.click('[data-sm="day"]'); await pg.wait_for_timeout(100); await pg.click('details[data-k="c_micro"] summary h2'); await pg.evaluate("document.querySelector('details[data-k=c_micro]').scrollIntoView();window.scrollBy(0,-50)"); await pg.wait_for_timeout(100); await pg.screenshot(path='shots/micros.png')
-    rows=await pg.locator('.mr').count(); print('micro rows',rows); assert rows==30
-    await pg.click('.mr >> nth=0'); await pg.wait_for_selector('#sheet2.on'); print('micro sheet:',(await pg.inner_text('#sbody2'))[:220].replace('\n',' | ')); await pg.screenshot(path='shots/micro-detail.png'); await pg.click('[data-close2]')
-    await pg.click('[data-sm="week"]'); await pg.wait_for_timeout(100); print('nutri micro:', 'Витамины и минералы' in await pg.inner_text('details.nutri'))
-    await pg.click('[data-sm="month"]'); await pg.wait_for_timeout(100); await pg.screenshot(path='shots/stats-month.png',full_page=False)
-    print('month advice',await pg.inner_text('.adv'))
-    txt=await pg.inner_text('#app'); import re
-    fr=re.findall(r'\d+[.,]\d+',txt.replace('2,5','').replace('3,2','')); print('fractions',fr[:5])
-    # поиск/OFF
-    await pg.click('[data-tab="diary"]'); await pg.click('#fab'); await pg.wait_for_timeout(600); await pg.fill('#vt','сырок'); await pg.click('#vparse'); await pg.wait_for_selector('.pi'); await pg.click('[data-pick="0"]')
-    await pg.fill('#pq','кефир'); await pg.click('[data-off]'); await pg.wait_for_timeout(6000); print('OFF results',await pg.locator('#sbody2 .res').count()); await pg.screenshot(path='shots/off-search.png')
-    await pg.click('[data-close2]'); await pg.click('[data-close]')
-    await pg.click('[data-tab="more"]'); await pg.screenshot(path='shots/settings.png',full_page=False)
-    sw=await pg.evaluate("navigator.serviceWorker.getRegistration().then(r=>!!r)"); print('sw',sw)
+    await pg.click('[data-tab="stats"]'); await pg.screenshot(path='shots/stats-day.png')
+    await pg.click('details[data-k="c_micro"] summary h2'); await pg.evaluate("document.querySelector('details[data-k=c_micro]').scrollIntoView();window.scrollBy(0,-50)"); await pg.screenshot(path='shots/micros.png')
+    assert await pg.locator('.mr').count()==30
+    await pg.click('[data-sm="week"]'); await pg.wait_for_timeout(100); await pg.screenshot(path='shots/stats.png'); await pg.screenshot(path='shots/stats-compact.png')
+    await pg.click('details.nutri summary h2'); await pg.evaluate("document.querySelector('details.nutri').scrollIntoView();window.scrollBy(0,-62)"); await pg.screenshot(path='shots/nutritionist.png')
+    nt=await pg.inner_text('details.nutri'); assert '/10' in nt and 'не медицинская' in nt
+    await pg.click('[data-sm="month"]'); await pg.screenshot(path='shots/stats-month.png')
+    txt=await pg.inner_text('#app'); print('fractions',[txt[max(0,m.start()-40):m.end()+5] for m in re.finditer(r'\d[.,]\d',txt.replace('2,5','').replace('3,2',''))][:3])
+    await pg.click('[data-tab="more"]'); assert 'Озвуч' not in await pg.inner_text('#app'); await pg.screenshot(path='shots/settings.png')
+    assert await pg.evaluate('window.__tts')==0, 'TTS не вызывался'
+    print('sw',await pg.evaluate("navigator.serviceWorker.getRegistration().then(r=>!!r)"))
     await b.close()
   net=[e for e in errs if 'openfoodfacts' in e or 'ERR_FAILED' in e]; app=[e for e in errs if e not in net]
-  print('OFF network errors (external):',len(net)); print('app console errors:',app); sys.exit(1 if app else 0)
+  print('app console errors:',app); sys.exit(1 if app else 0)
 asyncio.run(main())
