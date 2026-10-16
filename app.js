@@ -1,5 +1,5 @@
 'use strict';
-const VER='1.0.0';
+const VER='1.1.0';
 const $=s=>document.querySelector(s), R=Math.round, esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const MEALS=['завтрак','обед','ужин','перекус'], MI={завтрак:'🍳',обед:'🍲',ужин:'🍽️',перекус:'🍎'};
 const KEY='kbju.v1';
@@ -93,14 +93,23 @@ function vStats(){ const seg=`<div class="seg">${[['day','День'],['week','Н
      <h3>Доля калорий</h3><div class="tr" style="display:flex;height:12px;border-radius:6px;overflow:hidden;background:#eef1ef"><i style="width:${t.p*4/kc*100}%;background:var(--P)"></i><i style="width:${t.f*9/kc*100}%;background:var(--F)"></i><i style="width:${t.c*4/kc*100}%;background:var(--C)"></i></div>
      <div class="mu">Белки ${R(t.p*4/kc*100)}% · Жиры ${R(t.f*9/kc*100)}% · Углеводы ${R(t.c*4/kc*100)}%</div></div>`;
     const tf=topFoods(L); h+=`<div class="card"><h2>Топ продуктов дня</h2>${tf.length?tf.map(x=>`<div class="kv"><span>${esc(x.n)}</span><b>${R(x.k)} ккал</b></div>`).join(''):'<div class="empty">Нет записей</div>'}</div>`;
-    lastAdv.stat=advice(L,g,{water:S.water[cur]||0}); return h+advHtml(lastAdv.stat,'stat') }
+    lastAdv.stat=advice(L,g,{water:S.water[cur]||0}); return h+vNutri([cur])+advHtml(lastAdv.stat,'stat') }
   const keys=periodKeys(statMode), act=keys.filter(k=>day(k).length), n=Math.max(1,act.length), all=keys.flatMap(day), T=tot(all), av={k:T.k/n,p:T.p/n,f:T.f/n,c:T.c/n};
-  let h=seg+`<div class="card"><h2>Среднее за день <span class="mu">(${act.length} дн. с записями)</span></h2>${summary(av,g)}</div>`;
+  let h=seg+`<div class="card"><h2>Среднее за день <span class="mu">(${act.length} дн. с записями)</span></h2>${summary(av,g)}</div>`+vNutri(keys);
   h+=`<div class="card"><h2>Калории <span class="mu">— пунктир: цель ${g.k}</span></h2>${chart(keys,'k',g.k,'#0f7a5a')}</div>`;
   h+=`<div class="card"><h2>Б/Ж/У (ккал) <span class="mu"><span style="color:var(--P)">■</span> Б <span style="color:var(--F)">■</span> Ж <span style="color:var(--C)">■</span> У</span></h2>${macroChart(keys)}<div class="g3" style="margin-top:6px;text-align:center"><div><b>${R(av.p)}</b><div class="mu">белки ср., г</div></div><div><b>${R(av.f)}</b><div class="mu">жиры ср., г</div></div><div><b>${R(av.c)}</b><div class="mu">углеводы ср., г</div></div></div></div>`;
   h+=`<div class="card"><h2>Белок по дням</h2>${chart(keys,'p',g.p,'#3b82f6')}</div>`;
   const tf=topFoods(all); h+=`<div class="card"><h2>Топ продуктов</h2>${tf.length?tf.map(x=>`<div class="kv"><span>${esc(x.n)} <span class="mu">×${x.c}</span></span><b>${R(x.k)} ккал</b></div>`).join(''):'<div class="empty">Нет записей</div>'}</div>`;
   lastAdv.stat=periodAdvice(keys); return h+advHtml(lastAdv.stat,'stat') }
+function vNutri(keys){ const r=NUTRI.analyze({days:keys.map(k=>({key:k,entries:day(k),water:S.water[k]||0})),goals:S.goals,prof:S.prof,tdee:mifflin(S.prof).tdee,mode:statMode,trackWater:S.set.water}); lastAdv.nutri=[[0,r.speech]];
+  const col=r.score>=8?'var(--g)':r.score>=5?'var(--F)':'var(--red)';
+  return `<details class="card nutri" ${S.set.nutriOpen!==false?'open':''}><summary class="row"><h2 class="sp" style="margin:0">🩺 Нутрициолог</h2>${r.empty?'':`<span class="score" style="background:${col}">${r.score}/10</span>`}<button class="btn s sm" data-say="nutri" onclick="event.preventDefault()">🔊</button><span class="chev">›</span></summary>
+  ${r.empty?`<div class="mu" style="margin-top:6px">${esc(r.plan[0])}</div>`:`
+  <h3>👍 Сильные стороны</h3>${r.strengths.map(x=>`<div class="adv"><span>✅</span><span>${esc(x.t)}</span></div>`).join('')||'<div class="mu">—</div>'}
+  <h3>⚠️ Что улучшить</h3>${r.problems.map(x=>`<div class="adv"><span>🔸</span><span>${esc(x.t)}${x.swap?`<br><b class="swap">→ ${esc(x.swap)}</b>`:''}</span></div>`).join('')||'<div class="mu">Серьёзных проблем нет.</div>'}
+  <h3>📋 План на завтра</h3><ol class="plan">${r.plan.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>
+  <div class="mu">Расход ~${R(r.tdee)} ккал · клетчатка ~${R(r.metrics.fiber)} г · овощи/фрукты ~${R(r.metrics.veg)} г · разных продуктов за 7 дн.: ${r.metrics.distinctWeek}</div>`}
+  <div class="mu" style="margin-top:6px;font-size:.72rem">ℹ️ Автоматический разбор по правилам, не медицинская рекомендация. При заболеваниях — к врачу/диетологу.</div></details>` }
 function recipeNut(r){ const s=r.ings.reduce((a,i)=>(a.k+=i.k*i.g/100,a.p+=i.p*i.g/100,a.f+=i.f*i.g/100,a.c+=i.c*i.g/100,a.g+=i.g,a),{k:0,p:0,f:0,c:0,g:0}); const y=r.yield||s.g||1;
   return {k:s.k/y*100,p:s.p/y*100,f:s.f/y*100,c:s.c/y*100,raw:s.g} }
 function vRecipes(){ let h=`<div class="card"><div class="row"><h2 class="sp">Мои рецепты</h2><button class="btn sm" data-newrec="1">＋ Рецепт</button></div><div class="mu">Добавляй голосом по названию: «мой плов 300 грамм» или «порция борща мамы».</div></div>`;
@@ -249,6 +258,7 @@ document.addEventListener('input',e=>{ const t=e.target,d=t.dataset;
   if(/^g[kpfc]$/.test(t.id)){ const k=+$('#gk').value,s=(+$('#gp').value)*4+(+$('#gf').value)*9+(+$('#gc').value)*4; $('#gsum').textContent=`Б/Ж/У дают ${R(s)} ккал (${k?R(s/k*100):0}% от цели)`; return }
   if(t.id==='sauto'){S.set.auto=t.checked;save();return} if(t.id==='swater'){S.set.water=t.checked;save();return}
 });
+document.addEventListener('toggle',e=>{ if(e.target.classList&&e.target.classList.contains('nutri')){S.set.nutriOpen=e.target.open;save()} },true);
 document.addEventListener('change',e=>{ const t=e.target,d=t.dataset; if(d.imeal!=null){V.items[+d.imeal].meal=t.value;return}
   if(t.id==='imp'&&t.files[0]){ t.files[0].text().then(x=>{ const j=JSON.parse(x); if(!j.days)throw 0; if(!confirm('Заменить текущие данные импортом?'))return; S=Object.assign(def(),j); save(); dirty(); render(); toast('Импортировано') }).catch(()=>toast('Неверный файл')) } });
 document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&e.target.id==='pq'){e.preventDefault();showRes()} });
