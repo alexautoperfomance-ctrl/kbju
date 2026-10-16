@@ -1,4 +1,4 @@
-# Playwright e2e, 440x956. Распознавание речи замокано (continuous + interim, iOS-подобные onend), TTS запрещён.
+# Playwright e2e, 440x956. Распознавание речи замокано (continuous=false + interim, iOS-подобные onend), TTS запрещён.
 import asyncio,sys,re
 from playwright.async_api import async_playwright
 URL=sys.argv[1] if len(sys.argv)>1 else 'http://127.0.0.1:18437/'
@@ -23,7 +23,7 @@ async def main():
     await c.add_init_script(FAKE); pg=await c.new_page()
     pg.on('console',lambda m: m.type=='error' and errs.append(m.text)); pg.on('pageerror',lambda e: errs.append(str(e)))
     await pg.goto(URL); await pg.wait_for_selector('#nav button')
-    assert 'v1.7.0' in await pg.inner_text('#ver')
+    assert 'v1.7.1' in await pg.inner_text('#ver')
     assert await pg.locator('text=🔊').count()==0, 'нет кнопок озвучки'
     # --- микрофон-переключатель: 3 сессии (iOS-рестарты) до нажатия «стоп»
     await pg.evaluate("window.__chunks=['на завтрак два яйца','и кофе с молоком','на обед 200 грамм гречки и куриная грудка']")
@@ -32,7 +32,7 @@ async def main():
     await pg.click('#mic'); await pg.wait_for_timeout(150)
     assert 'on' in (await pg.get_attribute('#mic','class')), 'активное состояние'
     await pg.wait_for_timeout(1300)
-    st=await pg.evaluate('window.__sr'); print('sr',st); assert st['started']>=3 and st['cfg'][0] and st['cfg'][1] and st['cfg'][2]=='ru-RU'
+    st=await pg.evaluate('window.__sr'); print('sr',st); assert st['started']>=3 and st['cfg'][0]==False and st['cfg'][1] and st['cfg'][2]=='ru-RU'
     assert await pg.locator('.pi').count()==0, 'до стопа не разбираем'
     vt=await pg.input_value('#vt'); print('vt:',vt); assert 'два яйца' in vt and 'кофе с молоком' in vt and 'гречки' in vt
     await pg.click('#mic'); await pg.wait_for_selector('.pi'); await pg.wait_for_timeout(200)

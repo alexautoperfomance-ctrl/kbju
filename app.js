@@ -1,5 +1,5 @@
 'use strict';
-const VER='1.7.0';
+const VER='1.7.1';
 const $=s=>document.querySelector(s), R=Math.round, esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const MEALS=['завтрак','обед','ужин','перекус'], MI={завтрак:'🍳',обед:'🍲',ужин:'🍽️',перекус:'🍎'};
 const KEY='kbju.v1';
@@ -199,7 +199,7 @@ function vGoals(){ const g=S.goals,p=S.prof,m=mifflin(p);
   <label>Цель</label><select id="cg">${[['lose','похудение (−18%)'],['keep','поддержание'],['gain','набор массы (+10%)']].map(([v,n])=>`<option value="${v}" ${p.goal===v?'selected':''}>${n}</option>`).join('')}</select>
   <div id="calc" style="margin-top:8px">${calcHtml(m)}</div><button class="btn w s" data-applycalc="1">Применить к целям</button></div>` }
 const calcHtml=m=>`<div class="kv"><span>Базовый обмен</span><b>${R(m.bmr)} ккал</b></div><div class="kv"><span>С активностью</span><b>${R(m.tdee)} ккал</b></div><div class="kv"><span>Рекомендуемо</span><b>${m.k} ккал · Б ${m.p} · Ж ${m.f} · У ${m.c}</b></div>`;
-function vMore(){ return `<div class="card"><h2>Настройки</h2><div class="tog"><span>💧 Учёт воды</span><input type="checkbox" id="swater" ${S.set.water?'checked':''}></div>
+function vMore(){ return `<div class="card"><h2>Настройки</h2><div class="tog"><span>💧 Учёт воды</span><input type="checkbox" id="swater" ${S.set.water?'checked':''}></div><div class="tog"><span>🐞 Отладка микрофона (строка событий)</span><input type="checkbox" id="smicdbg" ${S.set.micdbg?'checked':''}></div>
   <div class="mu">Голос: ${SR?'распознавание речи доступно':'встроенное распознавание недоступно — используй 🎤 на клавиатуре iPhone'}${isIOS?' · iOS':''}${standalone?' · приложение':''}</div></div>
   <div class="card"><h2>Данные</h2><div class="mu">Всё хранится только на этом устройстве. Делай резервную копию.</div><div class="row" style="margin-top:8px"><button class="btn s sp" data-export="1">⬇️ Экспорт</button><label class="btn s sp" style="margin:0;text-align:center;color:var(--g);font-size:.95rem">⬆️ Импорт<input type="file" id="imp" accept=".json,application/json" hidden></label></div>
   <button class="btn r w" style="margin-top:8px" data-wipe="1">Удалить все данные</button></div>
@@ -212,7 +212,7 @@ let V={items:[],mode:'diary',meal:null}; // голосовой ввод
 function openVoice(meal,mode){ V={items:[],mode:mode||'diary',meal:meal||null}; renderVoice() }
 function renderVoice(){ const rm=V.mode==='recipe', ex=rm?'«500 грамм риса, 400 грамм говядины, 2 моркови, луковица, 3 ложки масла»':'«на завтрак два яйца и кофе с молоком, на обед 200 грамм гречки и куриная грудка»';
   sheet(`<div class="sh"><h2>${rm?'Ингредиенты голосом':'Что ты съел?'}</h2><button class="x" data-close="1">✕</button></div>
-  ${SR?`<button class="mic" id="mic" data-mict="vt" data-mica="parse" aria-label="Микрофон">🎙️</button><div class="mu" style="text-align:center" id="mst">Нажми и говори</div>`:''}
+  <button class="mic" id="mic" data-mict="vt" data-mica="parse" aria-label="Микрофон">🎙️</button><div class="mu" style="text-align:center" id="mst">${SR?'Нажми и говори':'Нажми 🎙️ или 🎤 на клавиатуре'}</div>
   ${!SR||isIOS?`<div class="hint">${SR?'Если микрофон не сработал — ':''}нажми в поле ниже и используй 🎤 <b>диктовку на клавиатуре iPhone</b>, затем «Разобрать».</div>`:''}
   <textarea id="vt" placeholder="${ex}"></textarea><div class="row" style="margin-top:6px">${rm?'':`<select id="vmeal" style="width:auto"><option value="">приём по фразе/времени</option>${MEALS.map(m=>`<option ${V.meal===m?'selected':''}>${m}</option>`).join('')}</select>`}<button class="btn sp" id="vparse">Разобрать</button></div>
   <div id="vres" style="margin-top:10px"></div>`); }
@@ -227,23 +227,48 @@ function doParse(text){ const mealSel=$('#vmeal')&&$('#vmeal').value; const r=KP
   r.forEach(x=>{ if(!x.meal)x.meal=mealSel||V.meal||KP.defaultMeal(); if(mealSel)x.meal=mealSel }); V.items=V.items.concat(r); renderItems();
   if(!r.length)toast('Не понял. Попробуй: «200 грамм гречки»') }
 function recalc(it){ if(it.food)Object.assign(it,KP.nutr(it.food,it.g)) }
-// Микрофон-переключатель: 1-е нажатие — старт, 2-е — стоп и разбор. continuous + interim; на iOS сессия сама завершается — перезапускаем, пока не нажали «стоп».
-const MIC={sr:null,on:false,target:null,btn:null,base:'',fin:'',tmp:'',done:null,restarts:0};
-function micStart(target,btn,done){ if(!SR){ const el=$('#'+target); if(el)el.focus(); toast('Используй 🎤 на клавиатуре iPhone'); return }
-  if(MIC.on){ micStop(); return }
-  const el=$('#'+target); Object.assign(MIC,{on:true,target,btn,done,base:el&&el.value.trim()?el.value.trim()+' ':'',fin:'',tmp:'',restarts:0});
-  document.querySelectorAll('.micb,.mic').forEach(b=>b.classList.toggle('on',b===btn)); const st=$('#mst'); if(st)st.textContent='Слушаю… нажми ещё раз, чтобы закончить'; micSession() }
-function micSession(){ let r; try{ r=new SR() }catch(e){ MIC.on=false; micUI(); toast('Распознавание недоступно'); return } MIC.sr=r;
-  r.lang='ru-RU'; r.continuous=true; r.interimResults=true; r.maxAlternatives=1;
-  r.onresult=e=>{ let tmp=''; for(let i=e.resultIndex||0;i<e.results.length;i++){ const x=e.results[i]; if(x.isFinal)MIC.fin+=x[0].transcript.trim()+' '; else tmp+=x[0].transcript } MIC.tmp=tmp; const el=$('#'+MIC.target); if(el){el.value=(MIC.base+MIC.fin+tmp).replace(/\s+/g,' ').trimStart(); el.dispatchEvent(new Event('input',{bubbles:true}))} };
-  r.onerror=e=>{ if(e.error==='not-allowed'||e.error==='service-not-allowed'||e.error==='audio-capture'){ MIC.on=false; micUI(); const st=$('#mst'); if(st)st.textContent='Нет доступа к микрофону — используй диктовку клавиатуры 🎤'; else toast('Нет доступа к микрофону') } };
-  r.onend=()=>{ if(MIC.sr!==r)return; if(MIC.on){ MIC.fin+=MIC.tmp?MIC.tmp+' ':''; MIC.tmp=''; MIC.restarts++; setTimeout(()=>{ if(MIC.on)micSession() },120); } else micFinish() };
-  try{ r.start() }catch(e){ MIC.on=false; micUI() } }
-function micStop(){ if(!MIC.sr){MIC.on=false;micUI();return} MIC.on=false; micUI(); try{ MIC.sr.stop() }catch(e){ micFinish() } setTimeout(()=>{ if(MIC.sr)micFinish() },1500) }
-function micFinish(){ const r=MIC.sr; MIC.sr=null; if(!r&&!MIC.done)return; const el=$('#'+MIC.target); if(el&&MIC.tmp){ el.value=(MIC.base+MIC.fin+MIC.tmp).trim(); } MIC.tmp=''; const cb=MIC.done; MIC.done=null; if(cb&&el)cb(el.value.trim()) }
-function micUI(){ document.querySelectorAll('.micb,.mic').forEach(b=>b.classList.toggle('on',MIC.on&&b===MIC.btn)); const st=$('#mst'); if(st&&!MIC.on&&!/доступа/.test(st.textContent))st.textContent='Нажми и говори' }
-function micCancel(){ if(MIC.on||MIC.sr){ MIC.done=null; MIC.on=false; try{MIC.sr&&MIC.sr.abort()}catch(e){} MIC.sr=null; micUI() } }
-const micBtn=(target,act)=>SR?`<button class="micb" data-mict="${target}" data-mica="${act}" aria-label="Диктовать">🎙️</button>`:'';
+// Микрофон-переключатель (iOS-устойчивый): 1-е нажатие — старт, 2-е — ВСЕГДА стоп.
+// Сессии continuous=false; управляемый перезапуск, пока пользователь не нажал «стоп» (лимит + backoff).
+// Финальный и промежуточный текст сразу пишется в поле — ничего не теряется. Сторож 8 с. Ошибки → понятные сообщения; в PWA при сбое — диктовка клавиатуры.
+const MIC={sr:null,on:false,target:null,btn:null,base:'',sess:'',tmp:'',done:null,restarts:0,empty:0,got:false,wd:null,rt:null,fails:0,t0:0};
+const MIC_MAX=25, MIC_WD=8000, STANDALONE=!!(navigator.standalone||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches));
+const MIC_ERR={'no-speech':'Не слышу речь — говори ближе к микрофону','aborted':'','audio-capture':'Микрофон недоступен (занят другим приложением?)',
+ 'not-allowed':'Нет доступа к микрофону — разреши в Настройки → Safari → Микрофон','service-not-allowed':'Распознавание речи недоступно в этом режиме iOS',
+ 'network':'Нет сети для распознавания речи','language-not-supported':'Русский язык распознавания недоступен','bad-grammar':'Ошибка распознавания','phrases-not-supported':'Ошибка распознавания'};
+const MIC_HARD=/not-allowed|service-not-allowed|language-not-supported|audio-capture|network/;
+function mlog(ev){ if(!S.set.micdbg)return; const el=$('#micdbg'); if(!el)return; const t=MIC.t0?((Date.now()-MIC.t0)/1000).toFixed(1):'0.0';
+  mlog.l=(mlog.l||[]).concat(t+'s '+ev).slice(-10); el.textContent='🎙 '+mlog.l.join(' · '); el.style.display='block' }
+function mst(t){ const st=$('#mst'); if(st)st.textContent=t; else if(t)toast(t) }
+function micKbd(target,why){ micReset(); const el=$('#'+target); if(el){ el.focus(); try{el.setSelectionRange(el.value.length,el.value.length)}catch(e){} }
+  mst((why?why+'. ':'')+'Нажми 🎤 на клавиатуре iPhone и диктуй'); toast((why?why+'. ':'')+'Используй 🎤 на клавиатуре iPhone'); mlog('fallback:kbd') }
+function micStart(target,btn,done){ if(MIC.on||MIC.sr){ mlog('tap:stop'); micStop(); return }
+  if(!SR){ micKbd(target,'Распознавание речи не поддерживается'); return }
+  if(MIC.fails>=2&&STANDALONE){ micKbd(target,'Микрофон в режиме приложения не работает'); return }
+  const el=$('#'+target); Object.assign(MIC,{on:true,target,btn,done,base:el&&el.value.trim()?el.value.trim()+' ':'',sess:'',tmp:'',restarts:0,empty:0,t0:Date.now()}); mlog.l=[]; mlog('tap:start'+(STANDALONE?' pwa':''));
+  micUI(); mst('Слушаю… нажми ещё раз, чтобы закончить'); micSession() }
+function micWrite(){ const el=$('#'+MIC.target); if(!el)return; const cur=(MIC.sess+(MIC.tmp?' '+MIC.tmp:'')).trim(); el.value=(MIC.base+(cur&&MIC.base.trim()&&!/[,;]\s*$/.test(MIC.base)?', ':'')+cur).replace(/\s+/g,' ').trimStart(); el.dispatchEvent(new Event('input',{bubbles:true})) }
+function micCommit(){ const add=(MIC.sess+' '+MIC.tmp).replace(/\s+/g,' ').trim(); if(add)MIC.base=(MIC.base.trim()?MIC.base.trim().replace(/[,;]$/,'')+', ':'')+add+' '; MIC.sess='';MIC.tmp=''; micWrite() }
+function micKick(){ clearTimeout(MIC.wd); if(MIC.on)MIC.wd=setTimeout(()=>{ mlog('watchdog'); const t=MIC.target; micStop(true); mst('Микрофон не ответил за 8 с — попробуй ещё раз или 🎤 на клавиатуре'); if(STANDALONE||MIC.fails>=1)micKbd(t,'Микрофон не ответил'); MIC.fails++ },MIC_WD) }
+function micSession(){ let r; try{ r=new SR() }catch(e){ mlog('ctor-fail'); micKbd(MIC.target,'Распознавание недоступно'); return }
+  MIC.sr=r; MIC.got=false; r.lang='ru-RU'; r.continuous=false; r.interimResults=true; r.maxAlternatives=1;
+  const live=()=>MIC.sr===r;
+  r.onstart=()=>{ if(live()){mlog('start');micKick()} }; r.onaudiostart=()=>{ if(live()){mlog('audio');micKick()} }; r.onspeechstart=()=>{ if(live()){mlog('speech');micKick()} };
+  r.onresult=e=>{ if(!live())return; micKick(); let fin='',tmp=''; for(let i=0;i<e.results.length;i++){ const x=e.results[i], s=(x[0]&&x[0].transcript||'').trim(); if(x.isFinal)fin+=s+' '; else tmp+=s+' ' }
+    MIC.sess=fin.trim(); MIC.tmp=tmp.trim(); MIC.got=MIC.got||!!(fin+tmp).trim(); mlog('result'+(fin?':final':':interim')); micWrite() };
+  r.onerror=e=>{ if(!live())return; const c=e.error||'unknown'; mlog('error:'+c); if(c==='aborted')return;
+    if(MIC_HARD.test(c)){ MIC.fails++; const t=MIC.target, m=MIC_ERR[c]; micCommit(); micStop(true); if(STANDALONE||/service-not-allowed|language/.test(c))micKbd(t,m); else mst(m+' — или 🎤 на клавиатуре'); return }
+    if(c==='no-speech'&&MIC.empty>=2)mst(MIC_ERR[c]); else if(MIC_ERR[c]==null)mst('Ошибка микрофона: '+c) };
+  r.onend=()=>{ if(!live())return; mlog('end'); micCommit(); if(!MIC.got)MIC.empty++; else MIC.empty=0; MIC.sr=null;
+    if(MIC.on&&MIC.restarts<MIC_MAX&&MIC.empty<4){ MIC.restarts++; const d=Math.min(1500,120*Math.pow(2,Math.max(0,MIC.empty))); clearTimeout(MIC.rt); MIC.rt=setTimeout(()=>{ if(MIC.on)micSession() },d); micKick() }
+    else { const e=MIC.on&&MIC.empty>=4; micStop(e); if(e)mst('Ничего не распознано — попробуй ещё раз или 🎤 на клавиатуре') } };
+  try{ r.start(); mlog('start()'); micKick() }catch(e){ mlog('start-throw:'+(e.name||'')); MIC.fails++; MIC.sr=null; const t=MIC.target; micStop(true); micKbd(t,'Не удалось включить микрофон') } }
+// стоп: снять флаг, abort(), сбросить UI, вернуть текст колбэку
+function micStop(quiet){ const r=MIC.sr, cb=MIC.done; micCommit(); MIC.on=false; MIC.sr=null; MIC.done=null; clearTimeout(MIC.wd); clearTimeout(MIC.rt);
+  if(r){ try{r.abort()}catch(e){} } micUI(); if(!quiet)mst('Нажми и говори'); mlog('stopped'); const el=$('#'+MIC.target); if(cb&&el&&el.value.trim())cb(el.value.trim()) }
+function micReset(){ const r=MIC.sr; MIC.on=false; MIC.sr=null; MIC.done=null; clearTimeout(MIC.wd); clearTimeout(MIC.rt); if(r){try{r.abort()}catch(e){}} micUI() }
+function micUI(){ document.querySelectorAll('.micb,.mic').forEach(b=>b.classList.toggle('on',MIC.on&&b===MIC.btn)) }
+function micCancel(){ if(MIC.on||MIC.sr){ micCommit(); micReset(); mlog('cancel') } }
+const micBtn=(target,act)=>`<button class="micb" data-mict="${target}" data-mica="${act}" aria-label="Диктовать">🎙️</button>`;
 const pl=(n,a,b,c)=>{n=Math.abs(n)%100;const m=n%10;return n>10&&n<20?c:m===1?a:m>1&&m<5?b:c};
 function saveVoice(){ const ok=V.items.filter(i=>i.food&&i.g>0); if(!ok.length){toast('Нечего сохранять');return}
   if(V.mode==='recipe'){ RE.ings=RE.ings.concat(ok.map(i=>({n:i.food.n,g:R(i.g),k:i.food.k,p:i.food.p,f:i.food.f,c:i.food.c,m:i.food.m||microOf(i.food.n)||undefined}))); closeSheet(); openRecipe(); return }
@@ -363,6 +388,7 @@ document.addEventListener('input',e=>{ const t=e.target,d=t.dataset;
   if(['cs','ca','cw','ch','cact','cg'].includes(t.id)){ readProf(); save(); $('#calc').innerHTML=calcHtml(mifflin(S.prof)); return }
   if(/^g[kpfc]$/.test(t.id)){ const k=+$('#gk').value,s=(+$('#gp').value)*4+(+$('#gf').value)*9+(+$('#gc').value)*4; $('#gsum').textContent=`Б/Ж/У дают ${R(s)} ккал (${k?R(s/k*100):0}% от цели)`; return }
   if(t.id==='swater'){S.set.water=t.checked;save();return}
+  if(t.id==='smicdbg'){S.set.micdbg=t.checked;save();const el=$('#micdbg');if(el){el.style.display=t.checked?'block':'none';el.textContent=t.checked?'🎙 отладка включена — нажми микрофон':''}return}
 });
 document.addEventListener('toggle',e=>{ const t=e.target; if(!t.classList)return; if(t.classList.contains('nutri')){S.set.nutriOpen=t.open;save()} else if(t.dataset&&t.dataset.k){S.set[t.dataset.k]=t.open;save()} },true);
 document.addEventListener('change',e=>{ const t=e.target,d=t.dataset; if(tab==='menu'&&menuChange(t))return; if(d.imeal!=null){V.items[+d.imeal].meal=t.value;return}
