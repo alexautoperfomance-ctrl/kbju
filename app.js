@@ -1,5 +1,5 @@
 'use strict';
-const VER='1.9.0';
+const VER='1.10.0';
 const $=s=>document.querySelector(s), R=Math.round, esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const MEALS=['завтрак','обед','ужин','перекус'], MI={завтрак:'🍳',обед:'🍲',ужин:'🍽️',перекус:'🍎'};
 const KEY='kbju.v1';
@@ -148,15 +148,24 @@ function mopt(){ return S.menu&&S.menu.opt||{meals:5,excl:[],simple:false} }
 function mGen(opt){ const t0=Date.now(), w=MENU.genWeek(mc(),Object.assign({},opt,{seed:opt.seed})); S.menu={opt,gk:mgk(),sel:S.menu&&S.menu.sel||0,week:w.map(d=>({seed:d.seed,meals:d.meals.map(m=>({k:m.k,m:m.m,items:m.items.map(x=>({n:x.n,g:x.g,lo:x.lo,hi:x.hi,typ:x.typ,grp:x.grp,slot:x.slot}))}))}))}; save(); return Date.now()-t0 }
 function mDay(i){ const d=S.menu.week[i]; return MENU.evalDay({meals:JSON.parse(JSON.stringify(d.meals))},mc()) }
 function mStore(i,d){ S.menu.week[i]={seed:d.seed||S.menu.week[i].seed,meals:d.meals.map(m=>({k:m.k,m:m.m,items:m.items.map(x=>({n:x.n,g:x.g,lo:x.lo,hi:x.hi,typ:x.typ,grp:x.grp,slot:x.slot,v:x.v,e:x.e}))})),own:d.own}; save() }
+let SWP=null;
+function openSwap(mi,ii,skip){ const i=S.menu.sel||0, dd=mDay(i), it=dd.meals[mi]&&dd.meals[mi].items[ii]; if(!it)return; let opts=MENU.swapOptions(mc(),S.menu.opt,dd,mi,ii,{n:5,skip});
+  if(!opts.length&&skip.length){ skip=[]; opts=MENU.swapOptions(mc(),S.menu.opt,dd,mi,ii,{n:5}) } SWP={mi,ii,skip,opts,n:it.n};
+  const f=fdb(it.n)||{k:0}, g=S.goals, dl=(a,b)=>{ const x=R(a-b); return x?`<i class="${Math.abs(x)/b>.03?'bad':''}">${x>0?'+':''}${x}</i>`:'' };
+  sheet(`<div class="sh"><h2>🔄 Заменить</h2><button class="x" data-close="1">✕</button></div>
+   <div class="mu swcur">${MI[dd.meals[mi].m]||'🍎'} ${esc(dd.meals[mi].m)} · сейчас: <b>${esc(it.n)}</b> ${R(it.g)} г · ${R(f.k*it.g/100)} ккал · ${esc(MENU.ROLE[it.grp]||'')}</div>
+   ${opts.length?opts.map((o,j)=>`<button class="swo" data-swpick="${j}"><span class="n">${esc(o.n)}</span><span class="mu">${R(o.g)} г</span><span class="k">${R(o.k)}</span><span class="swd ${Math.abs(o.tot.k-g.k)/g.k>.03?'bad':''}">день ${R(o.tot.k)} ккал · Б ${R(o.tot.p)} Ж ${R(o.tot.f)} У ${R(o.tot.c)}</span></button>`).join(''):'<div class="card hint">Других вариантов этой роли нет (проверь исключения в настройках меню).</div>'}
+   <div class="row" style="margin-top:8px"><button class="btn s sp" data-swmore="1">🔄 Ещё варианты</button></div>
+   <div class="mu" style="margin-top:6px">Цель: ${R(g.k)} ккал · Б ${R(g.p)} Ж ${R(g.f)} У ${R(g.c)}. После выбора граммы остальных блюд дня подстраиваются под цели.</div>`) }
 function vMenu(){ if(!S.menu||!S.menu.week)mGen(mopt()); const M=S.menu, i=M.sel||0, d=mDay(i), g=S.goals, o=M.opt;
   const dlt=(a,b,tol)=>{ const e=Math.abs(a-b)/b; return e<=tol?'ok':'bad' };
   let h=`<div class="card mwk">${WD.map((n,j)=>`<button class="${j===i?'on':''}" data-mday="${j}">${n}</button>`).join('')}</div>`;
   if(M.gk!==mgk()) h+=`<div class="card hint">Цели или профиль изменились — <button class="btn sm" data-mweek="1">пересоставить неделю</button></div>`;
   h+=`<div class="card row"><button class="btn sp" data-mdict="1">🎙️ Надиктовать своё меню</button></div>`+(S.menu.week[i].own?`<div class="card hint">✍️ Свой день (надиктован)</div>`:'');
   h+=`<div class="card"><div class="mtot"><div class="${dlt(d.tot.k,g.k,.03)}"><b>${R(d.tot.k)}</b><span>/ ${R(g.k)} ккал</span></div><div class="cP ${dlt(d.tot.p,g.p,.05)}"><b>${R(d.tot.p)}</b><span>/ ${R(g.p)} Б</span></div><div class="cF ${dlt(d.tot.f,g.f,.05)}"><b>${R(d.tot.f)}</b><span>/ ${R(g.f)} Ж</span></div><div class="cC ${dlt(d.tot.c,g.c,.05)}"><b>${R(d.tot.c)}</b><span>/ ${R(g.c)} У</span></div></div>
-   <div class="row" style="margin-top:6px"><button class="btn s sm sp" data-mregen="1">🔄 Другой вариант</button><button class="btn sm sp" data-maddday="1">＋ Весь день в дневник</button></div></div>`;
-  h+=`<div class="card">`+d.meals.map((m,mi)=>`<div class="meal"><div class="mh">${MI[m.m]||'🍎'} ${m.m[0].toUpperCase()+m.m.slice(1)} <span class="mu">${R(m.tot.k)} ккал · ${R(m.tot.p)}·${R(m.tot.f)}·${R(m.tot.c)}</span><button class="add" data-madd="${mi}" aria-label="В дневник">＋</button></div>`+
-    m.items.map((x,ii)=>{ const f=fdb(x.n)||{k:0}; return `<div class="it il mi"><span class="n">${esc(x.n)}</span><span class="mu">${R(x.g)}г</span><span class="k">${R(f.k*x.g/100)}</span>${x.v?'':`<button class="sw" data-mswap="${mi}:${ii}" aria-label="Заменить">⇄</button>`}</div>` }).join('')+`</div>`).join('')+`</div>`;
+   <div class="row" style="margin-top:6px"><button class="btn s sm sp" data-mregen="1">🔄 Заменить день</button><button class="btn sm sp" data-maddday="1">＋ Весь день в дневник</button></div></div>`;
+  h+=`<div class="card">`+d.meals.map((m,mi)=>`<div class="meal"><div class="mh">${MI[m.m]||'🍎'} ${m.m[0].toUpperCase()+m.m.slice(1)} <span class="mu">${R(m.tot.k)} ккал · ${R(m.tot.p)}·${R(m.tot.f)}·${R(m.tot.c)}</span>${m.items.some(x=>x.v)?'':`<button class="sw mreg" data-mmeal="${mi}" aria-label="Заменить приём">🔄</button>`}<button class="add" data-madd="${mi}" aria-label="В дневник">＋</button></div>`+
+    m.items.map((x,ii)=>{ const f=fdb(x.n)||{k:0}; return `<div class="it il mi"><span class="n">${esc(x.n)}</span><span class="mu">${R(x.g)}г</span><span class="k">${R(f.k*x.g/100)}</span>${x.v?'':`<button class="sw" data-mswap="${mi}:${ii}" aria-label="Заменить блюдо">🔄</button>`}</div>` }).join('')+`</div>`).join('')+`</div>`;
   const nt=MENU.notes(d), ml=d.micro.filter(m=>m.k!=='Na');
   h+=`<details class="card col" data-k="m_micro" ${S.set.m_micro!==false?'open':''}><summary class="row"><h2 class="sp">🧪 Витамины и минералы <span class="mu">${ml.filter(m=>m.t!=='lim'&&m.amt>=m.norm*.995).length}/${ml.filter(m=>m.t!=='lim').length} в норме</span></h2><span class="chev">›</span></summary>
    <div class="dmg">${ml.map(m=>{ const lim=m.t==='lim', st=lim?(m.amt>(m.ul||m.norm)?'over':''):m.ul&&m.amt>m.ul?'over':m.pct<99.5?'low':'', w=Math.min(100,m.pct);
@@ -219,7 +228,10 @@ function dictClick(d,t){
 function menuClick(d,t){
   if(d.mday!=null){ S.menu.sel=+d.mday; save(); render(); return true }
   if(d.mregen){ const i=S.menu.sel||0, w=S.menu.week.map((_,j)=>mDay(j)); const nd=MENU.regenDay(mc(),S.menu.opt,w,i,(Date.now()>>>0)); mStore(i,nd); render.keep=true; render(); toast('Новый вариант дня'); return true }
-  if(d.mswap){ const [mi,ii]=d.mswap.split(':').map(Number), i=S.menu.sel||0, dd=mDay(i), old=dd.meals[mi].items[ii].n; MENU.swapItem(mc(),S.menu.opt,dd,mi,ii,Date.now()>>>0); mStore(i,dd); render.keep=true; render(); toast(`${old} → ${dd.meals[mi].items[ii].n}, день пересчитан`); return true }
+  if(d.mswap){ const [mi,ii]=d.mswap.split(':').map(Number); openSwap(mi,ii,[]); return true }
+  if(d.swmore){ openSwap(SWP.mi,SWP.ii,SWP.skip.concat(SWP.opts.map(o=>o.n))); return true }
+  if(d.swpick!=null){ const i=S.menu.sel||0, dd=mDay(i), r=SWP.opts[+d.swpick], old=dd.meals[SWP.mi].items[SWP.ii].n; if(!r||old!==SWP.n)return true; MENU.applySwap(mc(),dd,SWP.mi,SWP.ii,r); mStore(i,dd); closeSheet(); render.keep=true; render(); toast(`${old} → ${r.n}, граммы дня пересчитаны`); return true }
+  if(d.mmeal!=null){ const i=S.menu.sel||0, dd=mDay(i), mi=+d.mmeal; MENU.regenMeal(mc(),S.menu.opt,dd,mi,(Date.now()>>>0)); mStore(i,dd); render.keep=true; render(); toast(`${dd.meals[mi].m[0].toUpperCase()+dd.meals[mi].m.slice(1)}: новый вариант, день пересчитан`); return true }
   if(d.maddday){ const dd=mDay(S.menu.sel||0); mAdd([].concat(...dd.meals.map(m=>m.items.map(x=>[x,m.m])))); return true }
   if(d.madd!=null){ const dd=mDay(S.menu.sel||0), m=dd.meals[+d.madd]; mAdd(m.items.map(x=>[x,m.m])); return true }
   if(d.mweek){ const o=mopt(); o.seed=Date.now()>>>0; mGen(o); render(); toast('Неделя пересоставлена'); return true }

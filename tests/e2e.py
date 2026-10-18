@@ -23,7 +23,7 @@ async def main():
     await c.add_init_script(FAKE); pg=await c.new_page()
     pg.on('console',lambda m: m.type=='error' and errs.append(m.text)); pg.on('pageerror',lambda e: errs.append(str(e)))
     await pg.goto(URL); await pg.wait_for_selector('#nav button')
-    assert 'v1.9.0' in await pg.inner_text('#ver')
+    assert 'v1.10.0' in await pg.inner_text('#ver')
     assert await pg.locator('text=🔊').count()==0, 'нет кнопок озвучки'
     # --- микрофон-переключатель: 3 сессии (iOS-рестарты) до нажатия «стоп»
     await pg.evaluate("window.__chunks=['на завтрак два яйца','и кофе с молоком','на обед 200 грамм гречки и куриная грудка']")
@@ -130,7 +130,20 @@ async def main():
     nums=[int(x) for x in re.findall(r'\d+',mt)]; assert abs(nums[0]-nums[1])/nums[1]<=0.03, 'ккал ±3%'
     assert await pg.locator('.meal').count()==5 and await pg.locator('.dmr').count()==29
     await pg.evaluate("window.scrollTo(0,0)"); await pg.screenshot(path='shots/menu-day.png')
-    first=await pg.inner_text('.mi >> nth=0 >> .n'); await pg.click('[data-mswap="0:0"]'); await pg.wait_for_timeout(300); assert await pg.inner_text('.mi >> nth=0 >> .n')!=first, 'замена'
+    assert await pg.locator('.meal >> nth=0 >> .mi').count()>=3, 'завтрак из 3 блюд'
+    assert await pg.locator('[data-mswap]').count()==await pg.locator('.mi').count(), 'у каждого блюда своя кнопка замены'
+    assert await pg.locator('[data-mmeal]').count()==5 and await pg.locator('[data-mregen]').count()==1
+    first=await pg.inner_text('.mi >> nth=0 >> .n'); g_other0=await pg.inner_text('.mi >> nth=3 >> .mu')
+    await pg.click('[data-mswap="0:0"]'); await pg.wait_for_selector('#sheet.on .swo'); n=await pg.locator('.swo').count(); assert 3<=n<=5, f'вариантов {n}'
+    opts1=[await pg.inner_text(f'.swo >> nth={j} >> .n') for j in range(n)]; assert first not in opts1
+    print('swap opts:',opts1); await pg.evaluate("document.querySelector('#sheet').scrollTop=0"); await pg.screenshot(path='shots/menu-swap.png')
+    await pg.click('[data-swmore]'); await pg.wait_for_timeout(200); opts2=[await pg.inner_text(f'.swo >> nth={j} >> .n') for j in range(await pg.locator('.swo').count())]; print('more:',opts2); assert not set(opts1)&set(opts2), 'следующие варианты другие'
+    await pg.click('#sheet.on [data-close]'); await pg.wait_for_timeout(200); await pg.click('[data-mswap="0:0"]'); await pg.wait_for_selector('#sheet.on .swo')
+    pick=await pg.inner_text('.swo >> nth=0 >> .n'); await pg.click('[data-swpick="0"]'); await pg.wait_for_timeout(300); assert await pg.inner_text('.mi >> nth=0 >> .n')==pick, 'выбор применён'
+    mt=await pg.inner_text('.mtot'); nums=[int(x) for x in re.findall(r'\d+',mt)]; print('after swap',nums[:8]); assert abs(nums[0]-nums[1])/nums[1]<=0.03 and abs(nums[2]-nums[3])/nums[3]<=0.06, 'день сбалансирован после замены'
+    assert not re.search(r'\d[.,]\d', await pg.inner_text('.meal >> nth=0')), 'без дробей'
+    await pg.reload(); await pg.click('[data-tab="menu"]'); await pg.wait_for_selector('.mwk'); assert await pg.inner_text('.mi >> nth=0 >> .n')==pick, 'замена сохранилась после перезагрузки'
+    m0=await pg.inner_text('.meal >> nth=2'); await pg.click('[data-mmeal="2"]'); await pg.wait_for_timeout(300); assert await pg.inner_text('.meal >> nth=2')!=m0, 'замена приёма'
     before=await pg.inner_text('.meal'); await pg.click('[data-mregen]'); await pg.wait_for_timeout(300); print('regen changed',before!=await pg.inner_text('.meal'))
     st=await pg.evaluate("JSON.parse(localStorage.getItem('kbju.v1')).menu.week.length"); assert st==7
     await pg.click('[data-madd="0"]'); await pg.wait_for_timeout(200); await pg.click('[data-tab="diary"]'); await pg.click('[data-tab="menu"]'); assert 'Ср' in await pg.inner_text('.mwk .on')

@@ -26,4 +26,10 @@ const rate=k=>Math.round(hit[k]/tot[k]*100);
 console.log(`\nдней: ${days}, ${Math.round((Date.now()-t0)/days)} мс/день; калории+БЖУ все в допуске: ${Math.round(macroAll/days*100)}%`);
 console.log('попадания, %: '+Object.keys(tot).map(k=>k+' '+rate(k)).join(' · '));
 as(rate('k')>=95,'калории ±3% ≥95% дней'); ['p','f','c'].forEach(k=>as(rate(k)>=90,k+' ±5% ≥90% дней'));
+{ const ctx={foods:self.FOODS,MICRO:self.MICRO,MK:self.MK,norms:MI.norms({sex:'m',a:35}),goals:{k:2580,p:147,f:92,c:290}}, w=ME.genWeek(ctx,{meals:5}); const d=JSON.parse(JSON.stringify(w[0])); as(d.meals[0].items.length>=3,'завтрак ≥3 блюд');
+  for(const [mi,ii] of [[0,0],[0,1],[2,2],[4,0]]){ const it=d.meals[mi].items[ii]; if(!it)continue; const o=ME.swapOptions(ctx,{meals:5},d,mi,ii,{n:5});
+    as(o.length>=3&&o.length<=5,'вариантов '+o.length); as(o.every(r=>ME.groupsOf(it).includes(r.grp)&&r.n!==it.n),'та же роль'); as(o.every(r=>Number.isInteger(r.g)&&r.gs.every(Number.isInteger)),'целые граммы');
+    const o2=ME.swapOptions(ctx,{meals:5},d,mi,ii,{n:5,skip:o.map(r=>r.n)}); as(!o2.some(r=>o.some(q=>q.n===r.n)),'следующие варианты');
+    ME.applySwap(ctx,d,mi,ii,o[0]); as(d.meals[mi].items[ii].n===o[0].n&&Math.abs(d.tot.k-o[0].tot.k)<3,'применено'); as(Math.abs(d.tot.k-ctx.goals.k)/ctx.goals.k<=.04&&Math.abs(d.tot.p-ctx.goals.p)/ctx.goals.p<=.07,'ккал/Б после замены '+Math.round(d.tot.k)+'/'+Math.round(d.tot.p)) }
+  const n0=d.meals[1].items.map(x=>x.n).join(); ME.regenMeal(ctx,{meals:5},d,1,11); as(d.meals[1].items.map(x=>x.n).join()!==n0&&Math.abs(d.tot.k-ctx.goals.k)/ctx.goals.k<=.05,'замена приёма '+Math.round(d.tot.k)) }
 console.log(`${ok} passed, ${bad} failed`); process.exit(bad?1:0);

@@ -47,14 +47,14 @@ const realism=items=>items.reduce((s,it)=>s+.15*((it.g-it.typ)/Math.max(30,it.ty
 // подбор граммов: покоординатный спуск шагами 40/20/10/5 в границах
 function fitGrams(items,ctx,S,passes){ const n=4+S.NM.length, t=total(items,S.V,n); let L=lossOf(t,ctx.goals,S.NM)+realism(items);
   for(const st of [40,20,10,5]){ for(let p=0;p<(passes||6);p++){ let imp=false;
-    for(const it of items){ const v=S.V[it.n]; for(const s of [st,-st]){ const g2=it.g+s; if(g2<it.lo||g2>it.hi)continue;
+    for(const it of items){ const v=it.v||S.V[it.n]; if(!v||it.v)continue; for(const s of [st,-st]){ const g2=it.g+s; if(g2<it.lo||g2>it.hi)continue;
       for(let j=0;j<n;j++)t[j]+=v[j]*s; const g0=it.g; it.g=g2; const L2=lossOf(t,ctx.goals,S.NM)+realism(items);
       if(L2<L-1e-9){L=L2;imp=true;break} it.g=g0; for(let j=0;j<n;j++)t[j]-=v[j]*s } }
     if(!imp)break } }
   return L }
 function mealsFor(n){ return n<=3?['завтрак','обед','ужин']:n===4?['завтрак','обед','перекус','ужин']:['завтрак','перекус','обед','перекус2','ужин'] }
 function poolFor(groups,opt,S){ const ex=(opt.excl||[]).map(e=>EXCL[e]).filter(Boolean);
-  const out=[]; groups.forEach(gk=>P[gk].forEach(([n,lo,hi,typ])=>{ if(!S.V[n]||ex.some(f=>f(n))||(opt.simple&&PRICY.test(n)))return; out.push({n,lo,hi,typ,grp:gk}) })); return out }
+  const out=[]; groups.forEach(gk=>P[gk].forEach(([n,lo,hi,typ])=>{ if(!S.V[n]||ex.some(f=>f(n))||(opt.simple&&PRICY.test(n)))return; out.push({n,lo:gk==='add'||gk==='cheese'?Math.max(lo,10):gk==='oil'?Math.max(lo,5):lo,hi,typ,grp:gk}) })); return out }
 // разнообразие: штраф за повтор в соседний день / за неделю
 function varPen(c,ctxV,meal){ if(!ctxV)return 0; let p=0; const k=c.n; if(ctxV.adj&&ctxV.adj.has(k))p+=MAIN[c.grp]?60:4; p+=(ctxV.week[k]||0)*(MAIN[c.grp]?3:1); return p }
 function genDay(ctx,opt,seed,vctx){ let best=null; for(let r=0;r<3;r++){ const d=genDay1(ctx,opt,seed+r*104729,vctx); d.L=score(d,vctx); if(!best||d.L<best.L)best=d; if(ok(d))break } return best }
@@ -75,7 +75,7 @@ function genDay1(ctx,opt,seed,vctx){ const S=ctx.S||(ctx.S=setup(ctx)); const rn
   fitGrams(items(),ctx,S,10); return pack(slots,ctx,S) }
 function repair(items,ctx,S){ const n=4+S.NM.length; for(let it=0;it<60;it++){ const t=total(items,S.V,n); let bad=-1;
     S.NM.forEach((d,j)=>{ const u=d.t==='lim'?(d.ul||d.norm):d.ul; if(u&&t[4+j]>u&&bad<0)bad=j });
-    if(bad<0)return; let b=null,bv=0; items.forEach(x=>{ const v=S.V[x.n][4+bad]*x.g; if(v>bv&&x.g-5>=x.lo){bv=v;b=x} }); if(!b)return; b.g-=5 } }
+    if(bad<0)return; let b=null,bv=0; items.forEach(x=>{ const v=(x.v||S.V[x.n])[4+bad]*x.g; if(v>bv&&x.g-5>=x.lo){bv=v;b=x} }); if(!b)return; b.g-=5 } }
 function pack(slots,ctx,S){ repair(slots.map(s=>s.it),ctx,S); const meals=[]; slots.forEach(s=>{ if(s.it.g<5)return; let m=meals.find(x=>x.k===s.mk); if(!m)meals.push(m={k:s.mk,m:s.m,items:[]}); m.items.push({n:s.it.n,g:s.it.g,lo:s.it.lo,hi:s.it.hi,typ:s.it.typ,grp:s.it.grp,slot:s.mk+':'+s.si}) });
   return evalDay({meals},ctx) }
 function evalDay(day,ctx){ const S=ctx.S||(ctx.S=setup(ctx)); const all=[].concat(...day.meals.map(m=>m.items)), n=4+S.NM.length, t=total(all,S.V,n);
@@ -99,6 +99,29 @@ function swapItem(ctx,opt,day,mi,ii,seed){ const S=ctx.S||(ctx.S=setup(ctx)); co
   const all=()=>[].concat(...day.meals.map(m=>m.items)); const rnd=rng(seed); const cands=pool.sort(()=>rnd()-.5).slice(0,6); let best=null,bl=1e18; const orig=all().map(x=>x.g);
   for(const c of cands){ day.meals[mi].items[ii]=Object.assign({},c,{g:c.typ,slot:it.slot}); const L=fitGrams(all(),ctx,S,6); if(L<bl){bl=L;best={c,gs:all().map(x=>x.g)}} all().forEach((x,k)=>{ if(x!==day.meals[mi].items[ii])x.g=orig[k] }) }
   day.meals[mi].items[ii]=Object.assign({},best.c,{g:best.c.typ,slot:it.slot}); all().forEach((x,k)=>x.g=best.gs[k]); return evalDay(day,ctx) }
-const M={P,T,EXCL,genDay,genWeek,regenDay,swapItem,evalDay,check,notes,mealsFor,hash,setup};
+// роль позиции → группы-кандидаты (по слоту шаблона, иначе по группе)
+const ROLE={brk:'каша/завтрак',fruit:'фрукт',soup:'суп',side:'гарнир',meat:'белок',fish:'белок',veg:'овощи',dairy:'молочное',add:'добавка',oil:'заправка',cheese:'сыр/хлеб'};
+function groupsOf(it){ const sl=(it.slot||'').split(':'), t=T[sl[0]]&&T[sl[0]][+sl[1]]; if(t&&t.includes(it.grp))return t; return it.grp==='meat'||it.grp==='fish'?['meat','fish']:[it.grp] }
+// варианты замены: 3–5 кандидатов той же роли, близких по калорийности; для каждого — перебалансированные граммы дня
+function swapOptions(ctx,opt,day,mi,ii,o){ o=o||{}; const S=ctx.S||(ctx.S=setup(ctx)); const it=day.meals[mi].items[ii]; if(!it||it.v)return [];
+  const used=new Set([].concat(...day.meals.map(m=>m.items.map(x=>x.n)))), skip=new Set(o.skip||[]), kc=n=>S.V[n][0]*100;
+  const k0=kc(it.n)*it.g/100; let pool=poolFor(groupsOf(it),opt,S).filter(c=>!used.has(c.n)&&!skip.has(c.n));
+  pool.forEach(c=>c.d=Math.abs(kc(c.n)*c.typ/100-k0)/Math.max(50,k0)); pool.sort((a,b)=>a.d-b.d); pool=pool.slice(0,Math.max(o.n||5,8));
+  const all=()=>[].concat(...day.meals.map(m=>m.items)), orig=all().map(x=>x.g), res=[];
+  for(const c of pool){ day.meals[mi].items[ii]=Object.assign({},c,{g:c.typ,slot:it.slot}); const hs=all().map(x=>x.hi); all().forEach(x=>{ if(!x.v)x.hi=Math.round(x.hi*1.3) }); let L=fitGrams(all(),ctx,S,12); repair(all(),ctx,S); all().forEach((x,k)=>x.hi=hs[k]); if(day.meals[mi].items[ii].g>c.hi)day.meals[mi].items[ii].g=c.hi;
+    res.push({n:c.n,grp:c.grp,role:ROLE[c.grp]||c.grp,L:L+c.d*2,gs:all().map(x=>Math.round(x.g)),lo:c.lo,hi:c.hi,typ:c.typ});
+    all().forEach((x,k)=>x.g=orig[k]) }
+  day.meals[mi].items[ii]=it; all().forEach((x,k)=>x.g=orig[k]);
+  res.sort((a,b)=>a.L-b.L); return res.slice(0,o.n||5).map(r=>{ const g=r.gs[all().indexOf(it)], t=total(all().map((x,k)=>({n:x===it?r.n:x.n,v:x===it?null:x.v,g:x===it?g:r.gs[k]})),S.V,4);
+    return Object.assign(r,{g,k:S.V[r.n][0]*g,tot:{k:t[0],p:t[1],f:t[2],c:t[3]}}) }) }
+function applySwap(ctx,day,mi,ii,r){ const it=day.meals[mi].items[ii], all=[].concat(...day.meals.map(m=>m.items)), k=all.indexOf(it);
+  day.meals[mi].items[ii]={n:r.n,g:r.gs[k],lo:r.lo,hi:r.hi,typ:r.typ,grp:r.grp,slot:it.slot};
+  [].concat(...day.meals.map(m=>m.items)).forEach((x,j)=>{ if(j!==k)x.g=r.gs[j] }); return evalDay(day,ctx) }
+// заменить весь приём: новые позиции той же роли, граммы дня перебалансируются
+function regenMeal(ctx,opt,day,mi,seed){ const S=ctx.S||(ctx.S=setup(ctx)), rnd=rng(seed), m=day.meals[mi]; const all=()=>[].concat(...day.meals.map(z=>z.items));
+  const used=new Set(all().map(x=>x.n)); m.items=m.items.map(it=>{ if(it.v)return it; const pool=poolFor(groupsOf(it),opt,S).filter(c=>!used.has(c.n)); if(!pool.length)return it;
+    const c=pool[Math.floor(rnd()*pool.length)]; used.add(c.n); return Object.assign({},c,{g:c.typ,slot:it.slot}) });
+  fitGrams(all(),ctx,S,10); repair(all(),ctx,S); all().forEach(x=>x.g=Math.round(x.g)); return evalDay(day,ctx) }
+const M={P,T,EXCL,ROLE,genDay,genWeek,regenDay,swapItem,swapOptions,applySwap,regenMeal,groupsOf,evalDay,check,notes,mealsFor,hash,setup};
 if(typeof module!=='undefined'&&module.exports)module.exports=M; else G.MENU=M;
 })(typeof self!=='undefined'?self:this);
