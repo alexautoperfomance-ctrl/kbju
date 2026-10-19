@@ -1,5 +1,5 @@
 'use strict';
-const VER='1.16.1';
+const VER='1.16.2';
 const $=s=>document.querySelector(s), R=Math.round, esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const MEALS=['завтрак','обед','ужин','перекус'], MI={завтрак:'🍳',обед:'🍲',ужин:'🍽️',перекус:'🍎'};
 const KEY='kbju.v1';
@@ -289,11 +289,11 @@ function vMore(){ return `<div class="card"><h2>Настройки</h2><div clas
 function sheet(html,n){ const s=$(n===2?'#sheet2':'#sheet'); $(n===2?'#sbody2':'#sbody').innerHTML=html; s.classList.add('on') }
 function closeSheet(n){ $(n===2?'#sheet2':'#sheet').classList.remove('on'); micCancel() }
 let V={items:[],mode:'diary',meal:null}; // голосовой ввод
-function openVoice(meal,mode){ V={items:[],mode:mode||'diary',meal:meal||null}; renderVoice() }
+function openVoice(meal,mode){ V={items:[],mode:mode||'diary',meal:meal||null}; renderVoice(); if(isIOS){ const t=$('#vt'); if(t)try{t.focus()}catch(e){} } }
 function renderVoice(){ const rm=V.mode==='recipe', ex=rm?'«500 грамм риса, 400 грамм говядины, 2 моркови, луковица, 3 ложки масла»':'«на завтрак два яйца и кофе с молоком, на обед 200 грамм гречки и куриная грудка»';
   sheet(`<div class="sh"><h2>${rm?'Ингредиенты голосом':'Что ты съел?'}</h2><button class="x" data-close="1">✕</button></div>
   <button class="mic" id="mic" data-mict="vt" data-mica="parse" aria-label="Микрофон">🎙️</button><div class="mu" style="text-align:center" id="mst">${SR?'Нажми и говори':'Нажми 🎙️ или 🎤 на клавиатуре'}</div>
-  ${!SR||isIOS?`<div class="hint">${SR?'Если микрофон не сработал — ':''}нажми в поле ниже и используй 🎤 <b>диктовку на клавиатуре iPhone</b>, затем «Разобрать».</div>`:''}
+  ${!SR||isIOS?`<div class="hint">📱 Надёжнее всего на iPhone: 🎤 <b>на клавиатуре</b> — диктовка не обрывается, потом «Разобрать».</div>`:''}
   <textarea id="vt" placeholder="${ex}"></textarea><div class="row" style="margin-top:6px">${rm?'':`<select id="vmeal" style="width:auto"><option value="">приём по фразе/времени</option>${MEALS.map(m=>`<option ${V.meal===m?'selected':''}>${m}</option>`).join('')}</select>`}<button class="btn sp" id="vparse">Разобрать</button></div>
   <div id="vres" style="margin-top:10px"></div>`); }
 function renderItems(){ const el=$('#vres'); if(!el)return; if(!V.items.length){el.innerHTML='';return} const rm=V.mode==='recipe';
@@ -344,19 +344,27 @@ const MIC={on:false,target:null,btn:null,fails:0,t0:0,eng:null};
 function mlog(ev){ if(!S.set.micdbg)return; const el=$('#micdbg'); if(!el)return; const t=MIC.t0?((Date.now()-MIC.t0)/1000).toFixed(1):'0.0';
   mlog.l=(mlog.l||[]).concat(t+'s '+ev).slice(-10); el.textContent='🎙 '+mlog.l.join(' · '); el.style.display='block' }
 function mst(t){ const st=$('#mst'); if(st)st.textContent=t; else if(t)toast(t) }
-function micKbd(target,why){ micReset(); const el=$('#'+target); if(el){ el.focus(); try{el.setSelectionRange(el.value.length,el.value.length)}catch(e){} }
+function micKbd(target,why,keep){ if(!keep)micReset(); const el=$('#'+target); if(el){ el.focus(); try{el.setSelectionRange(el.value.length,el.value.length)}catch(e){} }
   mst((why?why+'. ':'')+'Нажми 🎤 на клавиатуре iPhone и диктуй'); toast((why?why+'. ':'')+'Используй 🎤 на клавиатуре iPhone'); mlog('fallback:kbd') }
-function micEng(){ return MIC.eng||(MIC.eng=MICX.Mic({SR,log:mlog,status:mst,ui:on=>{MIC.on=on;micUI()},
+function micPanel(show,why){ let p=$('#micctl'); const st=$('#mst'); if(!p&&st){ st.insertAdjacentHTML('afterend','<div id="micctl" class="micctl"></div>'); p=$('#micctl') } if(!p)return;
+  p.innerHTML=show?`<div class="mu">${why?esc(why)+'. ':''}Текст сохранён — можно поправить в поле.</div><div class="row"><button class="btn sp" data-micnext="1">Дальше 🎙</button><button class="btn" data-micdone="1">Готово ✓</button></div>`:''; p.style.display=show?'block':'none' }
+function micEng(){ return MIC.eng||(MIC.eng=MICX.Mic({SR,log:mlog,status:mst,ui:on=>{MIC.on=on;micUI(); if(on)micPanel(false)},
   set:t=>{ const el=$('#'+MIC.target); if(!el)return; el.value=t; el.dispatchEvent(new Event('input',{bubbles:true})) },
-  kbd:why=>{ MIC.fails++; micKbd(MIC.target,why) },
-  fatal:(c,m)=>{ MIC.fails++; if(STANDALONE||/service-not-allowed|language/.test(c))micKbd(MIC.target,m); else mst(m+' — или 🎤 на клавиатуре') }})) }
-function micStart(target,btn,done){ if(MIC.on){ mlog('tap:stop'); micEng().stop(); return }
+  pause:why=>{ MIC.paused=true; mst((why?why+'. ':'')+'Пауза — «Дальше 🎙» продолжит, «Готово» — разобрать'); micPanel(true,why) },
+  fatal:(c,m)=>{ MIC.fails++; if(STANDALONE||/service-not-allowed|language/.test(c))micKbd(MIC.target,m,true); else mst(m+' — или 🎤 на клавиатуре') }})) }
+// done вызывается только по «Готово» — разбор всего текста поля (с правками пользователя)
+function micStart(target,btn,done){ const E=micEng();
+  if(MIC.on){ mlog('tap:stop'); E.stop(); return }
+  if(E.paused&&MIC.target===target){ micNext(); return }
   if(!SR){ micKbd(target,'Распознавание речи не поддерживается'); return }
   if(MIC.fails>=2&&STANDALONE){ micKbd(target,'Микрофон в режиме приложения не работает'); return }
-  const el=$('#'+target); Object.assign(MIC,{target,btn,t0:Date.now()}); mlog.l=[]; mlog('tap:start'+(STANDALONE?' pwa':'')); micEng().start(el?el.value:'',done) }
-function micReset(){ if(MIC.eng)MIC.eng.cancel(); MIC.on=false; micUI() }
+  const el=$('#'+target); Object.assign(MIC,{target,btn,t0:Date.now(),paused:false}); mlog.l=[]; mlog('tap:start'+(STANDALONE?' pwa':''));
+  E.start(el?el.value:'',t=>{ MIC.paused=false; micPanel(false); const f=$('#'+target); done(((f&&f.value)||t||'').trim()) }) }
+function micNext(){ const el=$('#'+MIC.target); MIC.paused=false; micPanel(false); micEng().resume(el?el.value:null) }
+function micDone(){ micEng().stop() }
+function micReset(){ if(MIC.eng)MIC.eng.cancel(); MIC.on=false; MIC.paused=false; micPanel(false); micUI() }
 function micUI(){ document.querySelectorAll('.micb,.mic').forEach(b=>b.classList.toggle('on',MIC.on&&b===MIC.btn)) }
-function micCancel(){ if(MIC.on)micReset() }
+function micCancel(){ if(MIC.on||MIC.paused)micReset() }
 const micBtn=(target,act)=>`<button class="micb" data-mict="${target}" data-mica="${act}" aria-label="Диктовать">🎙️</button>`;
 const pl=(n,a,b,c)=>{n=Math.abs(n)%100;const m=n%10;return n>10&&n<20?c:m===1?a:m>1&&m<5?b:c};
 function saveVoice(){ const ok=V.items.filter(i=>i.food&&i.g>0), miss=V.items.filter(i=>!i.food); if(miss.length&&!confirm('Не нашлось: '+miss.map(i=>'«'+i.text+'»').join(', ')+'. Записать остальное без них?'))return; if(!ok.length){toast('Нечего сохранять — выбери продукт');return}
@@ -456,7 +464,8 @@ document.addEventListener('click',e=>{ const mr=e.target.closest('[data-mic]'); 
   if(t.id==='prev'||t.id==='next'){cur=addD(cur,t.id==='prev'?-1:1);render();return}
   if(t.id==='fab'){openVoice();return} if(d.addm){openVoice(d.addm);return}
   if(d.close){closeSheet();return} if(d.close2){scanStop&&scanStop();closeSheet(2);return}
-  if(d.mict){ const act=d.mica; micStart(d.mict,t,v=>{ if(act==='parse'){ if(v){V.items=[];doParse(v)} } else if(act==='dict'){ if(v)dictRun(v) } else if(act==='search'){ showRes() } }); return } if(d.xsave&&V&&V.dish){ dishSave(); return } if(t.id==='vparse'){ const v=$('#vt').value; if(v.trim()){V.items=[];doParse(v)} return }
+  if(d.micnext){ micNext(); return } if(d.micdone){ micDone(); return }
+  if(d.mict){ const act=d.mica; micStart(d.mict,t,v=>{ if(act==='parse'){ if(v){V.items=[];doParse(v)} } else if(act==='dict'){ if(v)dictRun(v) } else if(act==='search'){ showRes() } }); return } if(d.xsave&&V&&V.dish){ dishSave(); return } if(t.id==='vparse'){ micCancel(); const v=$('#vt').value; if(v.trim()){V.items=[];doParse(v)} return }
   if(d.idel){V.items.splice(+d.idel,1);renderItems();return}
   if(d.pick){ const i=+d.pick, it=V.items[i]; openPicker(it.food?'':it.text,f=>{it.food=f; it.unsure=false; it.note=''; if(!it.num&&!it.unit)it.g=KP.grams(f,null,null,1); recalc(it); renderItems()},it.alts); return }
   if(d.cand){ const [i,j]=d.cand.split(':').map(Number), it=V.items[i], f=it.cands[j]; it.food=f; it.unsure=false; if(!(it.unit==='g'||(it.num>=20&&!it.unit)))it.g=KP.grams(f,it.num,it.unit?[0,it.unit,1]:null,1)||it.g; it.note=''; recalc(it); renderItems(); return }

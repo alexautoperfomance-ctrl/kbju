@@ -47,7 +47,8 @@ async def main():
     chk(not await red(pg),'стоп при зависшей сессии'); chk(await pg.evaluate('__m.aborted')>=1,'вызван abort()'); chk('кефир' in await pg.input_value('#vt'),'interim не потерян')
     # 4) нет событий вообще → сторож 8 с сбрасывает кнопку
     await pg.fill('#vt',''); await pg.evaluate("__m.mode='silent'"); await pg.click('#mic'); await pg.wait_for_timeout(500); chk(await red(pg),'silent: слушаем')
-    await pg.wait_for_timeout(8200); chk(await red(pg),'сторож 8 с: тихий повтор'); await pg.wait_for_timeout(8200); chk(not await red(pg),'сторож: после повтора кнопка сброшена'); chk('8 с' in await pg.inner_text('#mst') or 'клавиатур' in await pg.inner_text('#mst'),'сообщение сторожа')
+    await pg.wait_for_timeout(8200); chk(await red(pg),'сторож 8 с: тихий повтор'); await pg.wait_for_timeout(8200); chk(not await red(pg),'сторож: после повтора кнопка сброшена'); chk('не ответил' in await pg.inner_text('#mst'),'сообщение сторожа: '+await pg.inner_text('#mst')); chk(await pg.is_visible('[data-micnext]'),'пауза: видна «Дальше 🎙»'); chk(await pg.is_visible('[data-micdone]'),'пауза: видна «Готово ✓»')
+    await pg.evaluate("__m.mode='final-only';__m.chunks=['хлеб 30']"); await pg.fill('#vt','рис 100'); await pg.click('[data-micnext]'); await pg.wait_for_timeout(400); v=await pg.input_value('#vt'); chk('рис 100' in v and 'хлеб 30' in v,'«Дальше» дописывает: '+v); await pg.click('#mic'); await pg.wait_for_timeout(400); chk(not await red(pg),'стоп после «Дальше»'); chk('хлеб 30' in await pg.input_value('#vt'),'текст сохранён после стопа')
     # 5) service-not-allowed → понятное сообщение, кнопка не залипает, фокус в поле (диктовка клавиатуры)
     await pg.evaluate("__m.mode='service-not-allowed'"); await pg.click('#mic'); await pg.wait_for_timeout(400)
     chk(not await red(pg),'service-not-allowed: кнопка сброшена'); t=await pg.inner_text('#mst'); chk('клавиатур' in t and 'недоступно' in t,'сообщение + подсказка: '+t)
