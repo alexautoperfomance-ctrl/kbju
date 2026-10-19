@@ -1,5 +1,5 @@
 'use strict';
-const VER='1.13.0';
+const VER='1.13.1';
 const $=s=>document.querySelector(s), R=Math.round, esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const MEALS=['завтрак','обед','ужин','перекус'], MI={завтрак:'🍳',обед:'🍲',ужин:'🍽️',перекус:'🍎'};
 const KEY='kbju.v1';
@@ -181,7 +181,7 @@ function vMenu(){ if(!S.menu||!S.menu.week)mGen(mopt()); const M=S.menu, i=M.sel
   h+=`<div class="card"><div class="mtot"><div class="${dlt(d.tot.k,g.k,.03)}"><b>${R(d.tot.k)}</b><span>/ ${R(g.k)} ккал</span></div><div class="cP ${dlt(d.tot.p,g.p,.05)}"><b>${R(d.tot.p)}</b><span>/ ${R(g.p)} Б</span></div><div class="cF ${dlt(d.tot.f,g.f,.05)}"><b>${R(d.tot.f)}</b><span>/ ${R(g.f)} Ж</span></div><div class="cC ${dlt(d.tot.c,g.c,.05)}"><b>${R(d.tot.c)}</b><span>/ ${R(g.c)} У</span></div></div>
    <div class="row" style="margin-top:6px"><button class="btn s sm sp" data-mregen="1">🔄 Заменить день</button><button class="btn sm sp" data-maddday="1">＋ Весь день в дневник</button></div></div>`;
   h+=`<div class="card">`+d.meals.map((m,mi)=>`<div class="meal"><div class="mh">${MI[m.m]||'🍎'} ${m.m[0].toUpperCase()+m.m.slice(1)} <span class="mu">${R(m.tot.k)} ккал · ${R(m.tot.p)}·${R(m.tot.f)}·${R(m.tot.c)}</span>${m.items.some(x=>x.v)?'':`<button class="sw mreg" data-mmeal="${mi}" aria-label="Заменить приём">🔄</button>`}<button class="add" data-madd="${mi}" aria-label="В дневник">＋</button></div>`+
-    m.items.map((x,ii)=>{ const f=fdb(x.n)||{k:0}; return `<div class="it il mi"><span class="n">${esc(x.n)}</span><span class="mu">${R(x.g)}г</span><span class="k">${R(f.k*x.g/100)}</span>${x.v?'':`<button class="sw" data-mswap="${mi}:${ii}" aria-label="Заменить блюдо">🔄</button>`}</div>` }).join('')+`</div>`).join('')+`</div>`;
+    m.items.map((x,ii)=>{ const f=fdb(x.n)||{k:0}; return `<div class="it il mi"><span class="n">${esc(x.n)}</span><span class="mu">${R(x.g)}г</span><span class="k">${R(f.k*x.g/100)}</span>${x.v?'':`<button class="sw" data-mswap="${mi}:${ii}" aria-label="Заменить блюдо">🔄</button>`}${(()=>{ const ad=MADD[mKey(i,mi,ii,x)]; return `<button class="add ad1${ad?' on':''}" data-mdish="${mi}:${ii}" aria-label="${ad?'Убрать из дневника':'Блюдо в дневник'}">${ad?'✓':'＋'}</button>` })()}</div>` }).join('')+`</div>`).join('')+`</div>`;
   const nt=MENU.notes(d), ml=d.micro.filter(m=>m.k!=='Na');
   h+=`<details class="card col" data-k="m_micro" ${S.set.m_micro!==false?'open':''}><summary class="row"><h2 class="sp">🧪 Витамины и минералы <span class="mu">${ml.filter(m=>m.t!=='lim'&&m.amt>=m.norm*.995).length}/${ml.filter(m=>m.t!=='lim').length} в норме</span></h2><span class="chev">›</span></summary>
    <div class="dmg">${ml.map(m=>{ const lim=m.t==='lim', st=lim?(m.amt>(m.ul||m.norm)?'over':''):m.ul&&m.amt>m.ul?'over':m.pct<99.5?'low':'', w=Math.min(100,m.pct);
@@ -193,9 +193,11 @@ function vMenu(){ if(!S.menu||!S.menu.week)mGen(mopt()); const M=S.menu, i=M.sel
    <div class="row" style="margin-top:6px"><button class="btn sp" data-mweek="1">🔄 Пересоставить неделю</button></div>
    <div class="mu" style="margin-top:4px">Меню считается под цели (${R(g.k)} ккал, Б/Ж/У) и нормы микроэлементов по полу и возрасту.</div></details>`;
   return h }
-function mAdd(items,meal,dt){ dt=dt||dk(); const L=S.days[dt]=day(dt).slice(); let k=0;
-  items.forEach(([x,m])=>{ const f=x.e?{n:x.n,k:x.e.k,p:x.e.p,f:x.e.f,c:x.e.c,cat:'',src:'dict',m:x.e.m}:fdb(x.n); if(!f)return; const n=KP.nutr(f,x.g); L.push({id:uid(),meal:m,name:f.n,g:R(x.g),k:n.k,p:n.p,f:n.f,c:n.c,k100:f.k,p100:f.p,f100:f.f,c100:f.c,cat:f.cat||'',src:f.src||'',m100:f.m||undefined}); S.used[f.n]=(S.used[f.n]||0)+1; k+=n.k });
-  save(); dirty(); toast(`В дневник (${dt===dk()?'сегодня':fmtD(dt)}): ${items.length} · ${R(k)} ккал`) }
+// «＋» у блюда: ✓ — уже добавлено сегодня (повторное нажатие — отменить)
+const MADD={}; const mKey=(i,mi,ii,x)=>dk()+'|'+i+'|'+mi+'|'+ii+'|'+x.n+'|'+R(x.g);
+function mAdd(items,meal,dt,quiet){ dt=dt||dk(); const L=S.days[dt]=day(dt).slice(); let k=0; const ids=[];
+  items.forEach(([x,m])=>{ const f=x.e?{n:x.n,k:x.e.k,p:x.e.p,f:x.e.f,c:x.e.c,cat:'',src:'dict',m:x.e.m}:fdb(x.n); if(!f)return; const n=KP.nutr(f,x.g); const id=uid(); ids.push(id); L.push({id,meal:m,name:f.n,g:R(x.g),k:n.k,p:n.p,f:n.f,c:n.c,k100:f.k,p100:f.p,f100:f.f,c100:f.c,cat:f.cat||'',src:f.src||'',m100:f.m||undefined}); S.used[f.n]=(S.used[f.n]||0)+1; k+=n.k });
+  save(); dirty(); if(!quiet)toast(`В дневник (${dt===dk()?'сегодня':fmtD(dt)}): ${items.length} · ${R(k)} ккал`); return {ids,k} }
 // ---------- 🎙️ Диктовка своего меню ----------
 let DX=null;
 function dictOpt(){ return {KP,COOK,index:index(),MK,micro:n=>microOf(n),fdb,meal:KP.defaultMeal()} }
@@ -249,6 +251,10 @@ function menuClick(d,t){
   if(d.swpick!=null){ const i=S.menu.sel||0, dd=mDay(i), r=SWP.opts[+d.swpick], old=dd.meals[SWP.mi].items[SWP.ii].n; if(!r||old!==SWP.n)return true; MENU.applySwap(mc(),dd,SWP.mi,SWP.ii,r); mStore(i,dd); closeSheet(); render.keep=true; render(); toast(`${old} → ${r.n}, граммы дня пересчитаны`); return true }
   if(d.mmeal!=null){ const i=S.menu.sel||0, dd=mDay(i), mi=+d.mmeal; MENU.regenMeal(mc(),S.menu.opt,dd,mi,(Date.now()>>>0)); mStore(i,dd); render.keep=true; render(); toast(`${dd.meals[mi].m[0].toUpperCase()+dd.meals[mi].m.slice(1)}: новый вариант, день пересчитан`); return true }
   if(d.maddday){ const dd=mDay(S.menu.sel||0); mAdd([].concat(...dd.meals.map(m=>m.items.map(x=>[x,m.m])))); return true }
+  if(d.mdish){ const [mi,ii]=d.mdish.split(':').map(Number), i=S.menu.sel||0, dd=mDay(i), m=dd.meals[mi], x=m&&m.items[ii]; if(!x)return true; const key=mKey(i,mi,ii,x), was=MADD[key];
+    if(was){ const t=dk(); S.days[t]=day(t).filter(e=>!was.includes(e.id)); save(); dirty(); delete MADD[key]; toast('Убрано из дневника: '+x.n) }
+    else { const r=mAdd([[x,m.m]],null,null,true); MADD[key]=r.ids; toast(`✓ ${x.n} ${R(x.g)} г → ${m.m}, ${R(r.k)} ккал`) }
+    render.keep=true; render(); return true }
   if(d.madd!=null){ const dd=mDay(S.menu.sel||0), m=dd.meals[+d.madd]; mAdd(m.items.map(x=>[x,m.m])); return true }
   if(d.mweek){ const o=mopt(); o.seed=Date.now()>>>0; mGen(o); render(); toast('Неделя пересоставлена'); return true }
   return false }
