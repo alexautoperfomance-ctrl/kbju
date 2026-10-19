@@ -6,19 +6,25 @@ SRC=(sys.argv[1] if len(sys.argv)>1 else '/tmp/kc').rstrip('/')+'/'; OUT='/works
 os.makedirs(OUT,exist_ok=True)
 for f in glob.glob(OUT+'*'): os.remove(f)
 FW=set(json.load(open('/tmp/foodwords.json')))
-SHORT={'dodo-pizza':'Додо','dens-pizza':"Den's",'dominos-pizza':'Доминос','subjoy':'Сабджой','mu-mu':'Му-Му','yakitoriya':'Якитория','shokoladnitsa':'Шоколадница',
+SHORT={'dodo-pizza':'Додо','dens-pizza':"Den's",'dominos-pizza':'Доминос','subjoy':'Сабджой','subway':'Subway','kofe-hauz':'Кофе Хауз','steyk-burger-miratorg':'Мираторг','cinnabon':'Cinnabon','volkonsky':'Волконский','mu-mu':'Му-Му','yakitoriya':'Якитория','shokoladnitsa':'Шоколадница',
  'burger-king':'Бургер Кинг','rostics':"Rostic's",'vkusno-i-tochka':'Вкусно и точка','papa-johns':"Papa John's",'pizza-hut':'Pizza Hut','anderson':'АндерСон','teremok':'Теремок','tanuki':'Тануки',
  'stars-coffee':'Stars Coffee','sushi-wok':'Суши Wok','yaposha':'Япоша','cofix':'Cofix','vilka-lozhka':'Вилка-Ложка','dva-berega':'Два Берега','sushkof':'Сушкоф','prime-star':'Прайм','sushi-master':'Суши Мастер'}
 EXTRA={'vkusno-i-tochka':['вкусно и точка','вкусноточка','вкусно точка','вит','макдональдс','макдоналдс','макдак','мак','маке','мака','mcdonald\'s'],'rostics':['ростикс','ростик','ростикса','ростиксе','kfc','кфс','кфц','rostics'],
  'burger-king':['бк','бургер кинг','бургер кинге','бургер кинга','бургеркинг','burger king','bk'],'teremok':['теремок','теремке','теремка'],'tanuki':['тануки'],'cofix':['кофикс','cofix'],'anderson':['андерсон','андерсоне'],
  'papa-johns':['папа джонс','папа джонса','папа джонсе','papa johns'],'pizza-hut':['пицца хат','пицца хатт','пиццахат','pizza hut'],'surf-coffee':['сурф кофе','серф кофе','серф','surf'],'stars-coffee':['старс кофе','старс','stars coffee'],'sushi-wok':['суши вок','суши wok','sushi wok'],
- 'yaposha':['япоша','япоше','япоши'],'dodo-pizza':['додо','додопицц','dodo'],'dens-pizza':['денс','den\'s','dens','ден'],'dominos-pizza':['доминос','домино','dominos','domino\'s'],'subjoy':['сабджой','сабвей','сабвэй','subway','subjoy'],
+ 'yaposha':['япоша','япоше','япоши'],'dodo-pizza':['додо','додопицц','dodo'],'dens-pizza':['денс','den\'s','dens','ден'],'dominos-pizza':['доминос','домино','dominos','domino\'s'],'subjoy':['сабджой','subjoy'],'subway':['сабвей','сабвэй','сабвее','subway'],
  'mu-mu':['му-му','муму','му му','mu-mu'],'yakitoriya':['якитория','якитории','якиторию','якитори'],'shokoladnitsa':['шоколадница','шоколаднице','шоколадницы','шоко'],
+ 'pyaterochka':['пятерочка','пятерочке','пятерочки','пятерка','пятерке','пятерки','5ка','5-ка','пятёрочка'],'magnit':['магнит','магните','магнита','magnit'],'ashan':['ашан','ашане','ашана','auchan'],
+ 'okey':['окей','о кей','о\'кей','okey'],'azbuka-kafe':['азбука вкуса','азбуке вкуса','азбука','азбуке','кафе азбука вкуса'],'perekrestok-kafe':['перекресток кафе','перекресток select','перекресток селект','кафе перекресток'],
+ 'pyaterochka-kafe':['пятерочка кафе','кафе пятерочка','пятерка кафе'],'kofe-hauz':['кофе хауз','кофехауз','кофе хаус','coffee house'],'coffee-like':['кофе лайк','коффи лайк','coffee like','кофелайк'],
+ 'cinnabon':['синнабон','синабон','cinnabon'],'steyk-burger-miratorg':['мираторг','мираторге','miratorg'],'niyama':['нияма','нияме','ниямы','niyama'],'shtolle':['штолле','stolle'],
  'lavka':['яндекс лавка','яндекс лавке','лавка','лавке','лавки','лавку'],'vkusvill':['вкусвилл','вкусвилле','вкусвилла','вкус вилл','vkusvill'],'perekrestok':['перекресток','перекрестке','перекрестка','перекрёсток'],
  'metro':['метро','metro'],'yarche':['ярче','yarche'],'lenta':['лента','ленте','ленты','лента онлайн'],'igooods':['игудс','igooods','игуудс'],'dobryanka':['добрянка','добрянке','добрянки'],'bahetle':['бахетле','bahetle']}
 MERGE={'shokoladnitsa-eda':'shokoladnitsa','sushidays-nsk':'sushidays','ebidoebi':'yobidoyobi'}       # дубли одной сети: объединяем (первым — источник с полными Б/Ж/У)
 STORES={'lavka':(['lavka'],'Яндекс Лавка'),'vkusvill':(['vkusvill'],'ВкусВилл'),'igooods':(['igooods'],'igooods'),'metro':(['metro'],'Метро'),'bahetle':(['bahetle-sib','bahetle-lavka'],'Бахетле'),
- 'dobryanka':(['dobryanka'],'Добрянка'),'lenta':(['lenta','lenta-eda','lenta-igooods'],'Лента'),'perekrestok':(['perekrestok'],'Перекрёсток'),'yarche':(['yarche'],'Ярче')}
+ 'dobryanka':(['dobryanka'],'Добрянка'),'lenta':(['lenta','lenta-eda','lenta-igooods'],'Лента'),'perekrestok':(['perekrestok'],'Перекрёсток'),'yarche':(['yarche'],'Ярче'),'pyaterochka':(['pyaterochka-eda'],'Пятёрочка'),'magnit':(['magnit-eda'],'Магнит'),'ashan':(['ashan-eda'],'АШАН'),'okey':(['okey-eda'],"О'КЕЙ"),
+ 'azbuka-kafe':(['azbuka-vkusa-kafe-eda'],'Кафе Азбука вкуса'),'perekrestok-kafe':(['perekrestok-kafe-eda'],'Перекрёсток Кафе Select')}
+KAFE_INTO={'pyaterochka-kafe-eda':'pyaterochka-kafe'}   # товары «Пятёрочка Кафе» — в меню одноимённой сети
 def num(x):
     try: return None if x is None or x=='' else float(x)
     except: return None
@@ -67,7 +73,7 @@ for f in sorted(glob.glob(SRC+'chains/*.json')):
             if 'p' in x and v.get('volume_ml') and k>80 and re.search(r'капучино|латте|флэт|флет|американо|эспрессо|кортадо',nm.lower()) and g and g>=150:   # похоже, опубликовано на порцию, а не на 100 мл
                 m_=100/g; x.update(k=r1(k*m_),p=r1(p*m_),f=r1(fa*m_),c=r1(cc*m_)); k,p,fa,cc=x['k'],x['p'],x['f'],x['c']; x['pp']=1; C['drop']['пересчитано (порция→100 мл)']+=1
             if 'p' in x:
-                why=bad(nm+' '+it.get('category',''),k,p,fa,cc)
+                why=bad(nm+' '+it.get('category',''),k,p,fa,cc) or ('quality_flag' if v.get('quality_flag') or it.get('quality_flag') else None)
                 if why or (fa>45 and not re.search(r'соус|масл|майонез|орех|сало|шоколад',(nm+' '+it.get('category','')).lower())): x['bad']=1; C['bad']+=1; C['drop']['помечено: '+(why or 'жир>45')]+=1   # берётся типичное значение
             if v.get('volume_ml'): x['ml']=1
             vs.append(x)
@@ -79,8 +85,9 @@ for f in sorted(glob.glob(SRC+'chains/*.json')):
         if nm.lower() in seen:
             ex=next(i for i in items if i['n'].lower()==nm.lower()); labs={x['l'] for x in ex['v']}; ex['v']+= [x for x in vs if x['l'] not in labs]; continue
         seen.add(nm.lower()); items.append({'n':nm,'cat':it.get('category',''),'u':it.get('source_url',''),'v':vs})
-AMB={'маке','мака','брусника','горчица','ерш','процесс','прайм','prime','старс','stars','мак','ден','метро','metro','белок','nemo','krems','machete','valhalla','квантум','мечтатели','чайхона','потехин','хамовники','фарфор','перчини','рыбарис'}  # обычные слова — только после «в/из/кафе…»
+AMB={'фарш','буханка','мясо и рыба','хачапури и вино','грабли','азбука','азбуке','магнит','окей','маке','мака','брусника','горчица','ерш','процесс','прайм','prime','старс','stars','мак','ден','метро','metro','белок','nemo','krems','machete','valhalla','квантум','мечтатели','чайхона','потехин','хамовники','фарфор','перчини','рыбарис'}  # обычные слова — только после «в/из/кафе…»
 def aliases(slug,base,name):
+    base=[a for a in base if not (slug=='subjoy' and re.search(r'subway|сабв',a,re.I)) and not (slug=='steyk-burger-miratorg' and nrm(a)=='стейк бургер мираторг')]
     al=set(nrm(a) for a in base)|set(nrm(a) for a in EXTRA.get(slug,[])); al.add(nrm(name))
     out=[]
     for a in sorted(al,key=len,reverse=True):
@@ -88,6 +95,21 @@ def aliases(slug,base,name):
         amb=1 if a in AMB or len(a)<=2 and a not in ('бк','bk') else 0
         out.append([a,amb])
     return out
+for src,dst in KAFE_INTO.items():
+    C=chains.get(dst)
+    if not C: continue
+    for f in sorted(glob.glob(SRC+f'products/{src}-[0-9]*.json')):
+        for it in json.load(open(f,encoding='utf8'))['items']:
+            nm=re.sub(r'\s+',' ',it['name']).strip(); p100=it.get('per100') or {}; k,p,fa,cc=(num(p100.get(x)) for x in ('kcal','p','f','c'))
+            if k is None or nm.lower() in C['seen']: continue
+            if p is None or fa is None or cc is None: x={'l':'','k':r1(k),'est':1}; C['est']+=1
+            else:
+                why=bad(nm,k,p,fa,cc) or ('quality_flag' if it.get('quality_flag') else None)
+                if why: C['drop']['отброшено (товар): '+why]+=1; continue
+                x={'l':'','k':r1(k),'p':r1(p),'f':r1(fa),'c':r1(cc)}
+            g=num(it.get('weight_g'))
+            if g: x['g']=round(g)
+            C['seen'].add(nm.lower()); C['items'].append({'n':nm,'cat':it.get('category') or '','u':it.get('url',''),'v':[x]})
 for slug,C in chains.items():
     if not C['items']: continue
     sh=SHORT.get(slug,C['name']); js={'slug':slug,'name':C['name'],'short':sh,'site':C['site'],'items':C['items']}
@@ -108,7 +130,7 @@ for st,(srcs,name) in STORES.items():
                 if it.get('volume_ml') and not it.get('weight_g'): fl|=1
                 if p is None or fa is None or cc is None: fl|=2; est+=1; p=fa=cc=None
                 else:
-                    why=bad(nm+' '+(it.get('category') or ''),k,p,fa,cc)
+                    why=bad(nm+' '+(it.get('category') or ''),k,p,fa,cc) or ('quality_flag' if it.get('quality_flag') else None)
                     if why: dr[why]+=1; continue
                 if (mm:=re.search(r'(\d+)\s*/\s*(\d+)\s*г',nm)): g=int(mm.group(1))+int(mm.group(2))
                 if g and (g<=0 or g>20000): g=None

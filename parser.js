@@ -134,7 +134,15 @@ function chainIndex(slug){ if(CIDX[slug])return CIDX[slug]; const C=(G.CHAINS||[
   const foods=C.items.map(it=>{ const n=it.n.toLowerCase().replace(/[«»"]/g,''); const short=n.replace(/^(пицца|сэндвич|салат|суп|ролл|роллы|напиток|десерт)\s+/,''); return {n,s:short!==n?[short]:[],_it:it} });
   return CIDX[slug]={C,ix:makeIndex(foods,[])} }
 function genericFor(index,name){ const t=name.toLowerCase().replace(/[«»"()]/g,' ').trim(), w=tokens(t); for(const q of [t,w[0]||'']){ if(!q)continue; const a=search(index,q,1)[0]; if(a&&a.score>=tokens(q).length*10*.6)return a.food } return null }
-function chainMatch(slug,ch,index){ const ci=chainIndex(slug); if(!ci||!ch.text)return null; const qt=ch.text.replace(/(^|\s)пицц\S*/g,' ').trim()||ch.text; const res=search(ci.ix,qt,4); const b=res[0]; if(!b)return null;
+const MODW=[/\sс\s|\sсо\s/,/ассорти|набор|\sсет\s|бокс|пак\s/,/кокос/,/растител/,/сгущ/,/концентр/,/шоколад/,/коктейл/,/какао/,/детск/,/сухое|сухой|сухая/,/топлен/,/банан/,/клубни/,/ванил/,/карамел/,/безлакт/,/сырок/,/глазир/];
+function chainMatch(slug,ch,index){ const ci=chainIndex(slug); if(!ci||!ch.text)return null; const qt=ch.text.replace(/(^|\s)пицц\S*/g,' ').trim()||ch.text; let res=search(ci.ix,qt,ci.C.store?60:10);
+  if(ci.C.store){ // длинные названия товаров: искать все слова запроса в любом месте названия (без штрафа за бренд/фасовку)
+    const q0=tokens(qt).filter(t=>!STOP.has(t)&&!FILLER.has(t)&&!(t in ONES)).map(stem); if(!ci.tk)ci.tk=ci.ix.map(it=>it.ns[0]);
+    if(q0.length){ const have=new Set(res.map(a=>a.food)); ci.tk.forEach((nw,i)=>{ const f=ci.ix[i].f; if(have.has(f)||res.length>200)return; if(q0.every(q=>nw.some(x=>sim(q,x)>=.9)))res.push({food:f,score:q0.length*10-1,all:true,full:true,fz:0}) }) } }
+  if(!res.length)return null;
+  // предпочесть товар, чьё название начинается со слова запроса; штраф за модификаторы, которых не говорили («молоко» ≠ «сгущённое молоко»)
+  const qs=tokens(qt).map(stem), qraw=' '+qt.toLowerCase()+' '; res.forEach(a=>{ const nl=' '+a.food.n.toLowerCase()+' ', nw=tokens(a.food.n), f0=nw[0]?stem(nw[0]):''; let d=0; if(qs[0]&&same(f0,qs[0]))d+=4; MODW.forEach(m=>{ if(m.test(nl)&&!m.test(qraw))d-=8 });
+    if(ci.C.store){ a.score=(a.all?20:0)-nw.length*.5+d } }); res.sort((x,y)=>y.score-x.score); res.length=Math.min(res.length,4); const b=res[0];
   const q=qt.split(/\s+/).filter(Boolean).length||1; if(!(b.full||b.all||b.score>=q*10*.6))return null;
   return {food:chainFood(ci.C,b.food._it,ch,index),alts:res.slice(1).map(a=>chainFood(ci.C,a.food._it,{},index))} }
 function chainFood(C,it,ch,index){ let vs=it.v, v=vs[0];
