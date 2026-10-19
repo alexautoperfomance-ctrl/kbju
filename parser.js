@@ -165,16 +165,34 @@ function resolve(index,ch,raw,meal){ let alts=search(index,ch.text,6); const cm=
   if(food&&food.cnote)r.note=food.cnote+(r.note?' · '+r.note:'');
   if(cm){ r.unsure=false; r.cands=[food].concat(cm.alts).slice(0,3) }
   if(food)Object.assign(r,nutr(food,g)); return r }
+// свободная речь: убрать команды/междометия, «взвешенный» = готовый
+const CMD=[/(^|\s)(?:по|под|рас)?счита(?:й|ем|ть|йте)(?:-?ка|те)?(?=\s)/g,/(^|\s)(?:пожалуйста|сколько(?:\s+(?:будет|там|это|в))?|к?бжу|калори\S*|кбжу\S*|запиши(?:-?ка|те)?|добавь(?:-?ка|те)?|внеси(?:-?ка|те)?|это|уже|ну|вот|э+|эм+|м+|короче|значит|так|слушай|смотри|давай|тут|там)(?=\s)/g,
+  /(^|\s)(?:я\s+)?(?:съел[аи]?|поел[аи]?|выпил[аи]?|скушал[аи]?|покушал[аи]?)(?=\s)/g];
+function speech(t){ t=t.replace(/(^|\s)а\s+также(?=\s)/g,' , ').replace(/(^|\s)(?:вес(?:ом)?\s+)?в\s+готовом\s+виде(?=\s)/g,' готовый ').replace(/(^|\s)(?:взвешенн|отвешенн)\S*(?:\s+в\s+готов\S*)?(?=\s)/g,' готовый ');
+  for(let k=0;k<2;k++)for(const re of CMD)t=t.replace(re,'$1 ');
+  t=t.replace(/(^|\s)готов(?:ы|ое|ая|ый|ой|ую|ого|ые)?(?=\s)/g,'$1готовый'); t=t.replace(/(готовый\s+)+готовый(?=\s)/g,'готовый');
+  return t.replace(/\s+/g,' ').replace(/^\s*/,' ') }
+const QUAL=/^(готов|варен|отвар|жарен|туш|запеч|сыр|свеж|копчен|солен|печен|гриль|паров|вареный|приготовлен|домашн|обезжир)/;
+// разбить «готового риса готовый свинина» на продукты по самым длинным совпадениям в базе
+function segment(index,ws){ const n=ws.length; if(n<2||n>14)return null; const ok=[]; for(let i=0;i<n;i++){ ok[i]=[]; for(let L=1;L<=Math.min(4,n-i);L++){ const sp=ws.slice(i,i+L); if(sp.every(w=>QUAL.test(w)||STOP.has(w)||FILLER.has(w)))continue; if(STOP.has(sp[0])&&L>1)continue;
+      const b=search(index,sp.join(' '),1)[0]; const q=sp.filter(w=>!STOP.has(w)&&!FILLER.has(w)).length||1; if(b&&b.all&&b.score>=q*10*.6)ok[i][L]=b.score-3+(b.full?.5:0) } }
+  const best=new Array(n+1).fill(null); best[n]={v:0,segs:[]};
+  for(let i=n-1;i>=0;i--){ let c=best[i+1]&&{v:best[i+1].v,segs:best[i+1].segs}; for(let L=1;L<=4;L++){ const v=ok[i][L]; if(v&&best[i+L]&&(!c||v+best[i+L].v>c.v))c={v:v+best[i+L].v,segs:[[i,i+L]].concat(best[i+L].segs)} } best[i]=c }
+  const r=best[0]; if(!r||!r.segs.length)return null;
+  // одиночные определения («готовый») прикрепить к соседу
+  const segs=r.segs.map(x=>x.slice()); for(let i=0;i<n;i++){ if(segs.some(x=>i>=x[0]&&i<x[1])||!QUAL.test(ws[i]))continue; const nx=segs.find(x=>x[0]===i+1)||segs.find(x=>x[0]>i), pv=segs.slice().reverse().find(x=>x[1]===i);
+    const tgt=nx&&nx[0]===i+1?nx:pv||nx; if(!tgt)continue; const cand=tgt[0]>i?[i,tgt[1]]:[tgt[0],i+1], b=search(index,ws.slice(cand[0],cand[1]).filter((w,k)=>cand[0]+k===i||(k+cand[0]>=tgt[0]&&k+cand[0]<tgt[1])).join(' '),1)[0]; if(b&&b.all){ tgt.q=(tgt.q||[]).concat(i) } }
+  const out=segs.map(x=>ws.slice(x[0],x[1]).concat((x.q||[]).map(i=>ws[i])).join(' ')); out.r=segs; return out }
 function chunkHasQty(ts){ return ts.some((t,i)=>readNum(ts,i)||unitOf(t)) }
 function parse(text,opt){ opt=opt||{}; const index=opt.index||makeIndex(opt.foods||[],opt.recipes||[]);
-  let nt=norm(text); const chd=chainDetect(nt); CUR_CHAIN=chd&&G.CHAINS?chd.slug:null; if(chd)nt=chd.rest;
+  let nt=norm(text); const chd=chainDetect(nt); CUR_CHAIN=chd&&G.CHAINS?chd.slug:null; if(chd)nt=chd.rest; nt=speech(nt);
   const ts0=(nt.replace(/(^|\s)(с|со|в)\s+(кожур|кожиц|шкурк|скорлуп)[а-я]*/g,' целиком').replace(/[,;]/g,' , ').match(/[a-zа-я0-9.%-]+|,/g)||[]);
   for(let i=0;i<ts0.length;i++){ const r=readNum(ts0,i); if(r&&/^процент/.test(ts0[r.j]||'')){ ts0.splice(i,r.j-i+1,r.v+'%') } }
   const segs=opt.noMeals?[{meal:opt.meal||null,ts:ts0}]:splitMeals(ts0,opt.meal||defaultMeal(opt.now));
   const res=[];
   for(const seg of segs){ let chunks=splitItems(seg.ts);
     // склеить «кофе с молоком и сахаром», если целиком есть в базе
-    for(let i=0;i<chunks.length-1;i++){ if(chunkHasQty(chunks[i+1].filter(t=>!FILLER.has(t))))continue; const j=chunks[i].concat(['и'],chunks[i+1]); const c=parseChunk(index,j);
+    for(let i=0;i<chunks.length-1;i++){ if(chunkHasQty(chunks[i+1].filter(t=>!FILLER.has(t)))||chunks[i].findIndex((t,k)=>readNum(chunks[i],k)||unitOf(t))>0)continue; const j=chunks[i].concat(['и'],chunks[i+1]); const c=parseChunk(index,j);
       const b=search(index,c.text,1)[0]; if(b&&b.full){chunks.splice(i,2,j);i--} }
     // разбить по числам: «два яйца три банана»
     const ch2=[]; for(const c of chunks){ let cur=[],hasQ=false,hasF=false; for(let i=0;i<c.length;i++){ const r=/^(из|от)$/.test(c[i-1]||'')?null:readNum(c,i);
@@ -187,7 +205,15 @@ function parse(text,opt){ opt=opt||{}; const index=opt.index||makeIndex(opt.food
       if(!r.full&&!(r.all&&r.food&&/\s(с|со)\s/.test(' '+r.food.n+' '))&&/\s(с|со)\s/.test(' '+pc.text+' ')){ const parts=(' '+pc.text+' ').split(/\s(?:с|со)\s/).map(s=>s.trim()).filter(Boolean);
         if(parts.length>1){ const rs=parts.map((p,k)=>resolve(index,k===0?Object.assign({},pc,{text:p}):{num:null,unit:null,size:1,text:p},k?p:raw,seg.meal));
           if(rs.every(x=>x.food)){ rs.forEach(x=>res.push(x)); continue } } }
+      const noW=!/(^|\s)(с|со|и|в|из|без|на|под)(\s|$)/.test(pc.text), rfull=r.full&&!(noW&&r.food&&/\s(с|со)\s/.test(r.food.n));
+      if((!r.food||(!rfull&&noW))&&pc.text.split(' ').length>=2){ const ws=pc.text.split(' '), sg=segment(index,ws);
+        if(sg&&(sg.length>1||!r.food)){ const qi=c.findIndex((t,i)=>readNum(c,i)||unitOf(t)); let at=0;
+          if(qi>0){ const pw=ws.lastIndexOf(c[qi-1]); if(pw>=0){ const k=sg.r.findIndex(x=>pw>=x[0]&&pw<x[1]||(x.q||[]).includes(pw)); if(k>=0)at=k } }
+          const rs=sg.map((p,k)=>resolve(index,k===at?Object.assign({},pc,{text:p}):{num:null,unit:null,size:1,text:p},k===at?((qi>=0&&qi<c.indexOf(ws[0])?c.slice(qi,c.indexOf(ws[0])).join(' ')+' ':'')+p):p,seg.meal));
+          const sc=t=>{const b=search(index,t,1)[0];return b?b.score:0}, better=()=>noW&&!rfull&&sg.length>1&&rs.every(x=>x.full)&&(r.full||sc(pc.text)<ws.length*9)&&sg.reduce((a,p)=>a+sc(p),0)>sc(pc.text)+1;
+          if(rs.every(x=>x.food)&&(!r.food||(!r.all&&!r.full)||better())){ rs.forEach((x,k)=>{ if(k!==at&&/meat/.test(x.food.cat||'')&&x.cands.length>1)x.unsure=true; res.push(x) }); continue } } }
       res.push(r) } }
+  res.forEach(r=>{ if(r.food&&r.num==null&&!r.unit&&!r.note)r.note='вес не назван — порция '+Math.round(r.g)+' г' });
   return res }
 const P={chainIn,CHAIN_META,parse,search,makeIndex,tokens,stem,norm,grams,nutr,defaultMeal,readNum};
 if(typeof module!=='undefined'&&module.exports)module.exports=P; else G.KP=P;

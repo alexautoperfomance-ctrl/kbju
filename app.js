@@ -1,5 +1,5 @@
 'use strict';
-const VER='1.13.1';
+const VER='1.14.0';
 const $=s=>document.querySelector(s), R=Math.round, esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const MEALS=['завтрак','обед','ужин','перекус'], MI={завтрак:'🍳',обед:'🍲',ужин:'🍽️',перекус:'🍎'};
 const KEY='kbju.v1';
@@ -313,44 +313,24 @@ function recalc(it){ if(it.food)Object.assign(it,KP.nutr(it.food,it.g)) }
 // Микрофон-переключатель (iOS-устойчивый): 1-е нажатие — старт, 2-е — ВСЕГДА стоп.
 // Сессии continuous=false; управляемый перезапуск, пока пользователь не нажал «стоп» (лимит + backoff).
 // Финальный и промежуточный текст сразу пишется в поле — ничего не теряется. Сторож 8 с. Ошибки → понятные сообщения; в PWA при сбое — диктовка клавиатуры.
-const MIC={sr:null,on:false,target:null,btn:null,base:'',sess:'',tmp:'',done:null,restarts:0,empty:0,got:false,wd:null,rt:null,fails:0,t0:0};
-const MIC_MAX=25, MIC_WD=8000, STANDALONE=!!(navigator.standalone||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches));
-const MIC_ERR={'no-speech':'Не слышу речь — говори ближе к микрофону','aborted':'','audio-capture':'Микрофон недоступен (занят другим приложением?)',
- 'not-allowed':'Нет доступа к микрофону — разреши в Настройки → Safari → Микрофон','service-not-allowed':'Распознавание речи недоступно в этом режиме iOS',
- 'network':'Нет сети для распознавания речи','language-not-supported':'Русский язык распознавания недоступен','bad-grammar':'Ошибка распознавания','phrases-not-supported':'Ошибка распознавания'};
-const MIC_HARD=/not-allowed|service-not-allowed|language-not-supported|audio-capture|network/;
+const STANDALONE=!!(navigator.standalone||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches));
+const MIC={on:false,target:null,btn:null,fails:0,t0:0,eng:null};
 function mlog(ev){ if(!S.set.micdbg)return; const el=$('#micdbg'); if(!el)return; const t=MIC.t0?((Date.now()-MIC.t0)/1000).toFixed(1):'0.0';
   mlog.l=(mlog.l||[]).concat(t+'s '+ev).slice(-10); el.textContent='🎙 '+mlog.l.join(' · '); el.style.display='block' }
 function mst(t){ const st=$('#mst'); if(st)st.textContent=t; else if(t)toast(t) }
 function micKbd(target,why){ micReset(); const el=$('#'+target); if(el){ el.focus(); try{el.setSelectionRange(el.value.length,el.value.length)}catch(e){} }
   mst((why?why+'. ':'')+'Нажми 🎤 на клавиатуре iPhone и диктуй'); toast((why?why+'. ':'')+'Используй 🎤 на клавиатуре iPhone'); mlog('fallback:kbd') }
-function micStart(target,btn,done){ if(MIC.on||MIC.sr){ mlog('tap:stop'); micStop(); return }
+function micEng(){ return MIC.eng||(MIC.eng=MICX.Mic({SR,log:mlog,status:mst,ui:on=>{MIC.on=on;micUI()},
+  set:t=>{ const el=$('#'+MIC.target); if(!el)return; el.value=t; el.dispatchEvent(new Event('input',{bubbles:true})) },
+  kbd:why=>{ MIC.fails++; micKbd(MIC.target,why) },
+  fatal:(c,m)=>{ MIC.fails++; if(STANDALONE||/service-not-allowed|language/.test(c))micKbd(MIC.target,m); else mst(m+' — или 🎤 на клавиатуре') }})) }
+function micStart(target,btn,done){ if(MIC.on){ mlog('tap:stop'); micEng().stop(); return }
   if(!SR){ micKbd(target,'Распознавание речи не поддерживается'); return }
   if(MIC.fails>=2&&STANDALONE){ micKbd(target,'Микрофон в режиме приложения не работает'); return }
-  const el=$('#'+target); Object.assign(MIC,{on:true,target,btn,done,base:el&&el.value.trim()?el.value.trim()+' ':'',sess:'',tmp:'',restarts:0,empty:0,t0:Date.now()}); mlog.l=[]; mlog('tap:start'+(STANDALONE?' pwa':''));
-  micUI(); mst('Слушаю… нажми ещё раз, чтобы закончить'); micSession() }
-function micWrite(){ const el=$('#'+MIC.target); if(!el)return; const cur=(MIC.sess+(MIC.tmp?' '+MIC.tmp:'')).trim(); el.value=(MIC.base+(cur&&MIC.base.trim()&&!/[,;]\s*$/.test(MIC.base)?', ':'')+cur).replace(/\s+/g,' ').trimStart(); el.dispatchEvent(new Event('input',{bubbles:true})) }
-function micCommit(){ const add=(MIC.sess+' '+MIC.tmp).replace(/\s+/g,' ').trim(); if(add)MIC.base=(MIC.base.trim()?MIC.base.trim().replace(/[,;]$/,'')+', ':'')+add+' '; MIC.sess='';MIC.tmp=''; micWrite() }
-function micKick(){ clearTimeout(MIC.wd); if(MIC.on)MIC.wd=setTimeout(()=>{ mlog('watchdog'); const t=MIC.target; micStop(true); mst('Микрофон не ответил за 8 с — попробуй ещё раз или 🎤 на клавиатуре'); if(STANDALONE||MIC.fails>=1)micKbd(t,'Микрофон не ответил'); MIC.fails++ },MIC_WD) }
-function micSession(){ let r; try{ r=new SR() }catch(e){ mlog('ctor-fail'); micKbd(MIC.target,'Распознавание недоступно'); return }
-  MIC.sr=r; MIC.got=false; r.lang='ru-RU'; r.continuous=false; r.interimResults=true; r.maxAlternatives=1;
-  const live=()=>MIC.sr===r;
-  r.onstart=()=>{ if(live()){mlog('start');micKick()} }; r.onaudiostart=()=>{ if(live()){mlog('audio');micKick()} }; r.onspeechstart=()=>{ if(live()){mlog('speech');micKick()} };
-  r.onresult=e=>{ if(!live())return; micKick(); let fin='',tmp=''; for(let i=0;i<e.results.length;i++){ const x=e.results[i], s=(x[0]&&x[0].transcript||'').trim(); if(x.isFinal)fin+=s+' '; else tmp+=s+' ' }
-    MIC.sess=fin.trim(); MIC.tmp=tmp.trim(); MIC.got=MIC.got||!!(fin+tmp).trim(); mlog('result'+(fin?':final':':interim')); micWrite() };
-  r.onerror=e=>{ if(!live())return; const c=e.error||'unknown'; mlog('error:'+c); if(c==='aborted')return;
-    if(MIC_HARD.test(c)){ MIC.fails++; const t=MIC.target, m=MIC_ERR[c]; micCommit(); micStop(true); if(STANDALONE||/service-not-allowed|language/.test(c))micKbd(t,m); else mst(m+' — или 🎤 на клавиатуре'); return }
-    if(c==='no-speech'&&MIC.empty>=2)mst(MIC_ERR[c]); else if(MIC_ERR[c]==null)mst('Ошибка микрофона: '+c) };
-  r.onend=()=>{ if(!live())return; mlog('end'); micCommit(); if(!MIC.got)MIC.empty++; else MIC.empty=0; MIC.sr=null;
-    if(MIC.on&&MIC.restarts<MIC_MAX&&MIC.empty<4){ MIC.restarts++; const d=Math.min(1500,120*Math.pow(2,Math.max(0,MIC.empty))); clearTimeout(MIC.rt); MIC.rt=setTimeout(()=>{ if(MIC.on)micSession() },d); micKick() }
-    else { const e=MIC.on&&MIC.empty>=4; micStop(e); if(e)mst('Ничего не распознано — попробуй ещё раз или 🎤 на клавиатуре') } };
-  try{ r.start(); mlog('start()'); micKick() }catch(e){ mlog('start-throw:'+(e.name||'')); MIC.fails++; MIC.sr=null; const t=MIC.target; micStop(true); micKbd(t,'Не удалось включить микрофон') } }
-// стоп: снять флаг, abort(), сбросить UI, вернуть текст колбэку
-function micStop(quiet){ const r=MIC.sr, cb=MIC.done; micCommit(); MIC.on=false; MIC.sr=null; MIC.done=null; clearTimeout(MIC.wd); clearTimeout(MIC.rt);
-  if(r){ try{r.abort()}catch(e){} } micUI(); if(!quiet)mst('Нажми и говори'); mlog('stopped'); const el=$('#'+MIC.target); if(cb&&el&&el.value.trim())cb(el.value.trim()) }
-function micReset(){ const r=MIC.sr; MIC.on=false; MIC.sr=null; MIC.done=null; clearTimeout(MIC.wd); clearTimeout(MIC.rt); if(r){try{r.abort()}catch(e){}} micUI() }
+  const el=$('#'+target); Object.assign(MIC,{target,btn,t0:Date.now()}); mlog.l=[]; mlog('tap:start'+(STANDALONE?' pwa':'')); micEng().start(el?el.value:'',done) }
+function micReset(){ if(MIC.eng)MIC.eng.cancel(); MIC.on=false; micUI() }
 function micUI(){ document.querySelectorAll('.micb,.mic').forEach(b=>b.classList.toggle('on',MIC.on&&b===MIC.btn)) }
-function micCancel(){ if(MIC.on||MIC.sr){ micCommit(); micReset(); mlog('cancel') } }
+function micCancel(){ if(MIC.on)micReset() }
 const micBtn=(target,act)=>`<button class="micb" data-mict="${target}" data-mica="${act}" aria-label="Диктовать">🎙️</button>`;
 const pl=(n,a,b,c)=>{n=Math.abs(n)%100;const m=n%10;return n>10&&n<20?c:m===1?a:m>1&&m<5?b:c};
 function saveVoice(){ const ok=V.items.filter(i=>i.food&&i.g>0), miss=V.items.filter(i=>!i.food); if(miss.length&&!confirm('Не нашлось: '+miss.map(i=>'«'+i.text+'»').join(', ')+'. Записать остальное без них?'))return; if(!ok.length){toast('Нечего сохранять — выбери продукт');return}

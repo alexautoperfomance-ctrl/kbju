@@ -38,16 +38,16 @@ async def main():
     v=await pg.input_value('#vt'); chk('гречки' in v and 'грудка' in v and 'банан' in v,'final-only: весь текст сохранён: '+v); chk(await red(pg),'кнопка активна, пока не нажали стоп')
     await pg.click('#mic'); await pg.wait_for_timeout(300); chk(not await red(pg),'2-е нажатие — стоп'); chk(await pg.locator('.pi').count()==3,'разобрано 3 позиции')
     n=await pg.evaluate('__m.created'); await pg.wait_for_timeout(800); chk(await pg.evaluate('__m.created')==n,'после стопа перезапусков нет')
-    # 2) тишина: no-speech подряд → ограничение и сброс кнопки (нет бесконечного цикла)
+    # 2) паузы: no-speech подряд → продолжаем слушать (iOS), с backoff, стоп по нажатию
     await pg.fill('#vt',''); await pg.evaluate("__m.mode='no-speech'"); await pg.click('#mic'); await pg.wait_for_timeout(6000)
-    chk(not await red(pg),'no-speech: кнопка сброшена'); cr=await pg.evaluate('__m.created')-n; chk(cr<=6,f'no-speech: рестартов {cr} (лимит)'); chk('Ничего не распознано' in await pg.inner_text('#mst'),'сообщение «ничего не распознано»')
+    chk(await red(pg),'no-speech: всё ещё слушаем'); cr=await pg.evaluate('__m.created')-n; chk(2<=cr<=12,f'no-speech: рестартов {cr} (backoff)'); await pg.click('#mic'); await pg.wait_for_timeout(200); chk(not await red(pg),'стоп после пауз')
     # 3) interim и зависание без onend → стоп всё равно срабатывает сразу, interim сохранён
     await pg.fill('#vt',''); await pg.evaluate("__m.mode='hang-after-result';__m.chunks=['кефир 250']"); await pg.click('#mic'); await pg.wait_for_timeout(300)
     chk('кефир' in await pg.input_value('#vt'),'interim виден сразу'); await pg.click('#mic'); await pg.wait_for_timeout(100)
     chk(not await red(pg),'стоп при зависшей сессии'); chk(await pg.evaluate('__m.aborted')>=1,'вызван abort()'); chk('кефир' in await pg.input_value('#vt'),'interim не потерян')
     # 4) нет событий вообще → сторож 8 с сбрасывает кнопку
     await pg.fill('#vt',''); await pg.evaluate("__m.mode='silent'"); await pg.click('#mic'); await pg.wait_for_timeout(500); chk(await red(pg),'silent: слушаем')
-    await pg.wait_for_timeout(8200); chk(not await red(pg),'сторож 8 с: кнопка сброшена'); chk('8 с' in await pg.inner_text('#mst') or 'клавиатур' in await pg.inner_text('#mst'),'сообщение сторожа')
+    await pg.wait_for_timeout(8200); chk(await red(pg),'сторож 8 с: тихий повтор'); await pg.wait_for_timeout(8200); chk(not await red(pg),'сторож: после повтора кнопка сброшена'); chk('8 с' in await pg.inner_text('#mst') or 'клавиатур' in await pg.inner_text('#mst'),'сообщение сторожа')
     # 5) service-not-allowed → понятное сообщение, кнопка не залипает, фокус в поле (диктовка клавиатуры)
     await pg.evaluate("__m.mode='service-not-allowed'"); await pg.click('#mic'); await pg.wait_for_timeout(400)
     chk(not await red(pg),'service-not-allowed: кнопка сброшена'); t=await pg.inner_text('#mst'); chk('клавиатур' in t and 'недоступно' in t,'сообщение + подсказка: '+t)
@@ -62,7 +62,7 @@ async def main():
     await pg.evaluate("__m.mode='not-allowed'"); await pg.click('#mic'); await pg.wait_for_timeout(400)
     chk(not await red(pg),'PWA not-allowed: сброс'); chk(await pg.evaluate("document.activeElement.id")=='vt','PWA: фокус в поле'); chk('клавиатуре' in await pg.inner_text('#mst'),'PWA: подсказка 🎤')
     # 8) start() бросает исключение
-    await pg.evaluate("__m.mode='throw'"); await pg.click('#mic'); await pg.wait_for_timeout(200); chk(not await red(pg),'start() throw: сброс')
+    await pg.evaluate("__m.mode='throw'"); await pg.click('#mic'); await pg.wait_for_timeout(800); chk(not await red(pg),'start() throw: повтор и сброс')
     # 9) без SpeechRecognition вообще
     pg,errs=await page("delete window.webkitSpeechRecognition; window.webkitSpeechRecognition=undefined;"); await openv(pg); await pg.click('#mic'); await pg.wait_for_timeout(200)
     chk(await pg.evaluate("document.activeElement.id")=='vt' and 'клавиатуре' in await pg.inner_text('#mst'),'нет SR: диктовка клавиатуры')
