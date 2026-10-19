@@ -18,6 +18,8 @@
 фарш домашний=pork ground raw
 свинина=pork fresh composite of trimmed retail cuts (leg loin shoulder) separable lean and fat raw
 свиная вырезка=pork tenderloin separable lean only raw
+свиная грудинка=#167812
+свиная вырезка готовая=#168250
 свиная шея=pork shoulder whole separable lean and fat raw
 свиная корейка=pork loin whole separable lean and fat raw
 свиные ребра=pork spareribs separable lean and fat raw
@@ -421,3 +423,8 @@
 холодец=gelatins dry powder unsweetened
 
 маракуйя=passion-fruit (granadilla) purple raw
+# готовое мясо среднего отруба для обобщённых названий (build_micros: «X» ← X@c, «X сырая» ← X)
+свинина@c=#167855
+говядина@c=#170609
+баранина@c=#174308
+курица@c=#171051

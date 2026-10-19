@@ -61,6 +61,10 @@ for (n,syn,k,p,f,c,pc,po,g,cat) in rows:
             if i==0: syns+= [n+' '+VAR[g],VAR[g]+' '+n]
             o,y,oil=cook.cooked100(dict(k=k,p=p,f=f,c=c),cat,n,meth)
             add(n+' '+adj,syns,o['k'],o['p'],o['f'],o['c'],pc,po,cat,'derived',n); DCOOK[n+' '+adj]=dict(b=n,m=meth,y=y,oil=oil)
+        if cat=='meat':  # «готовая/готовый» без способа = запечённое/жареное без масла (сухой жар), USDA roasted там, где есть (GEN/COOKED ниже)
+            GOT={'m':'готовый','f':'готовая','n':'готовое','p':'готовые'}[g]
+            o,y,oil=cook.cooked100(dict(k=k,p=p,f=f,c=c),cat,n,'bake')
+            add(n+' '+GOT,['готовая '+n,'готовый '+n,'готовое '+n,'готовые '+n,n+' приготовленная']+[s+' '+GOT for s in syn[:3]]+(['вырезка готовая','готовая вырезка'] if n=='свиная вырезка' else []),o['k'],o['p'],o['f'],o['c'],pc,po,cat,'derived',n); DCOOK[n+' '+GOT]=dict(b=n,m='bake',y=y,oil=oil)
         for suf,meth in ((' на гриле','grill'),(' на пару','steam')):
             o,y,oil=cook.cooked100(dict(k=k,p=p,f=f,c=c),cat,n,meth)
             add(n+suf,[s+suf for s in syn[:2]]+([n+' гриль'] if meth=='grill' else []),o['k'],o['p'],o['f'],o['c'],pc,po,cat,'derived',n); DCOOK[n+suf]=dict(b=n,m=meth,y=y,oil=oil)
@@ -158,6 +162,22 @@ for n,r in RU.items():  # российские справочные значен
     if n in items: items[n].update(k=round(r['k']),p=r['p'],f=r['f'],c=r['c']); items[n]['ds']='ru-ref'
     else: add(n,r['s'],r['k'],r['p'],r['f'],r['c'],None,{'bread':30,'meat':50,'dairy':10}.get(r['cat'],100),r['cat'] or 'more','base'); items[n]['ds']='ru-ref'
     items[n]['rs']=r['src']
+# Обобщённое «свинина/говядина/баранина/курица» без способа = готовое мясо среднего отруба (люди взвешивают готовое).
+# Сырое значение остаётся ингредиентом рецептур (посчитано выше) и доступно как «… сырая». USDA SR Legacy:
+GEN={'свинина':(201,27.5,9.2,'f','USDA SR 167855 pork composite (leg, loin, shoulder) lean, cooked',['свиная вырезка','свиная шея','свиная корейка']),
+ 'говядина':(230,28.4,12.4,'f','USDA SR 170609 beef composite lean+fat 0" trim, cooked',['говяжья вырезка','говядина жареная']),
+ 'баранина':(206,28.2,9.5,'f','USDA SR 174308 lamb composite lean, cooked',['баранина жареная']),
+ 'курица':(219,24.7,12.6,'f','USDA SR 171051 chicken meat+skin, stewed',['куриная грудка отварная','курица жареная'])}
+COOKED={'свиная вырезка готовая':(143,26.17,3.51,'USDA SR 168250 pork tenderloin lean, cooked, roasted')}
+for n,(k,p_,f_,g,src,amb) in GEN.items(): COOKED[n+' готов'+('ая' if g=='f' else 'ый')]=(k,p_,f_,src)
+for n,(k,p_,f_,src) in COOKED.items():
+    if n in items: items[n].update(k=k,p=p_,f=f_,c=0); items[n]['ds']='usda'; items[n]['rs']=src
+for n,(k,p_,f_,g,src,amb) in GEN.items():
+    if n not in items: continue
+    x=items[n]; rn=n+(' сырая' if g=='f' else ' сырой')
+    if rn not in items:
+        add(rn,['сырая '+n,n+' сырое мясо'],x['k'],x['p'],x['f'],x['c'],x.get('pc'),x.get('po'),x['cat'],'derived',n); items[rn]['ds']=x.get('ds')
+    x.update(k=k,p=p_,f=f_,c=0); x['ds']='usda'; x['rs']=src; x['amb']=[a for a in amb if a in items]
 OFFRU=json.load(open('tools/off_ru.json',encoding='utf8'))
 for x in OFFRU:  # популярные российские упакованные продукты (Open Food Facts, страна: Россия; данные с упаковки)
     if x['n'] in items: continue

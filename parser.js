@@ -33,7 +33,7 @@ function stem(w){ if(IRR[w])return IRR[w]; if(/\d/.test(w)||w.length<=3)return w
 function norm(s){ return (' '+String(s).toLowerCase().replace(/ё/g,'е')+' ')
   .replace(/(\d)[,.](\d)/g,'$1.$2').replace(/(\d)\s*(процент\S*|%)/g,'$1% ')
   .replace(/(\d)(г|гр|кг|мл|л|шт)(?=[\s.,;]|$)/g,'$1 $2')
-  .replace(/(\s)пол(?=(стакан|тарелк|порци|литр|кило|банк|ложк|кружк|чашк|пачк|плитк|батон|буханк|кусочк|кусок|куска|банан|яблок|апельсин|авокадо|огурц|помидор|грейпфрут|лимон|пицц|лепешк|лаваш|булк|багет|шаурм|шаверм|пачк))/g,'$1пол ')
+  .replace(/(\s)пол(?=(бутылк|упаковк|стакан|тарелк|порци|литр|кило|банк|ложк|кружк|чашк|пачк|плитк|батон|буханк|кусочк|кусок|куска|банан|яблок|апельсин|авокадо|огурц|помидор|грейпфрут|лимон|пицц|лепешк|лаваш|булк|багет|шаурм|шаверм|пачк))/g,'$1пол ')
   .replace(/[«»"!?()]/g,' ').replace(/ - /g,' ').replace(/\s+/g,' ') }
 function tokens(s){ return (norm(s).match(/[a-zа-я0-9.%-]+/g)||[]).map(t=>t.replace(/^-+|-+$/g,'')).filter(Boolean) }
 function numVal(t){ if(/^\d+(\.\d+)?$/.test(t))return parseFloat(t); return t in ONES?ONES[t]:null }
@@ -112,7 +112,9 @@ function resolve(index,ch,raw,meal){ const alts=search(index,ch.text,6); const b
   else if(food&&food.rf&&pcs){ const n=Math.round((ch.num==null?1:ch.num)*10)/10; note=n+' шт ≈ '+g+' г '+edibleWord(food) }
   const q=ch.text.split(/\s+/).filter(Boolean).length||1;
   const unsure=!!(best&&(best.fz>0||best.score<q*10*.55||(alts[1]&&!best.full&&alts[1].score>best.score-1&&alts[1].food.k!==food.k)));
-  const cands=[]; alts.forEach(a=>{ if(cands.length<3&&!cands.some(c=>c.n===a.food.n||(c.k===a.food.k&&c.p===a.food.p&&c.f===a.food.f)))cands.push(a.food) }); const r={meal,text:ch.text,raw,g,num:ch.num,unit:ch.unit&&ch.unit[1],food,recipe:!!(best&&best.recipe),alts:alts.map(a=>a.food),full:!!(best&&best.full),all:!!(best&&best.all),unsure,cands,note};
+  // обобщённое мясо («свинина») без уточнения: по умолчанию готовый средний отруб, но предлагаем уточнить отруб
+  let amb=null; if(food&&food.amb&&food.amb.length&&best.full){ amb=[food].concat(food.amb.map(n=>{const a=search(index,n,1)[0];return a&&a.food.n===n?a.food:null}).filter(Boolean)) }
+  const cands=amb?amb.slice(0,3):[]; if(!amb)alts.forEach(a=>{ if(cands.length<3&&!cands.some(c=>c.n===a.food.n||(c.k===a.food.k&&c.p===a.food.p&&c.f===a.food.f)))cands.push(a.food) }); const r={meal,text:ch.text,raw,g,num:ch.num,unit:ch.unit&&ch.unit[1],food,recipe:!!(best&&best.recipe),alts:alts.map(a=>a.food),full:!!(best&&best.full),all:!!(best&&best.all),unsure:unsure||!!(amb&&amb.length>1),cands,note};
   if(food)Object.assign(r,nutr(food,g)); return r }
 function chunkHasQty(ts){ return ts.some((t,i)=>readNum(ts,i)||unitOf(t)) }
 function parse(text,opt){ opt=opt||{}; const index=opt.index||makeIndex(opt.foods||[],opt.recipes||[]);

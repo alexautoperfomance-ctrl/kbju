@@ -1,4 +1,4 @@
-const V='1.11.0',C='kbju-'+V,F=['./','index.html','app.js','parser.js','nutri.js','db.js','micro.js','micros.js','menu.js','cook.js','dictate.js','manifest.json','icon-192.png','icon-512.png','apple-touch-icon.png'];
+const V='1.11.1',C='kbju-'+V,F=['./','index.html','app.js','parser.js','nutri.js','db.js','micro.js','micros.js','menu.js','cook.js','dictate.js','manifest.json','icon-192.png','icon-512.png','apple-touch-icon.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(F.map(u=>new Request(u,{cache:'reload'})))));self.skipWaiting()});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x)))).then(()=>self.clients.claim()))});
 // network-first без HTTP-кэша (cache:'no-store' — iOS не отдаст устаревший index.html); офлайн — из кэша
