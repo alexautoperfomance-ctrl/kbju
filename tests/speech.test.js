@@ -1,5 +1,5 @@
 // node tests/speech.test.js — свободная речь: без пунктуации, команды, слитные перечисления, ошибки распознавания
-global.self=global; require('../db.js'); require('../chains.js'); const P=require('../parser.js'); const ix=P.makeIndex(self.FOODS,[]);
+global.self=global; require('../db.js'); require('./chains_node.js'); const P=require('../parser.js'); const ix=P.makeIndex(self.FOODS,[]);
 const C=[
 ["Посчитай-ка БЖУ 100 г готового риса это уже взвешенный готовы свинина",[["рис",100],["свинина готовая",150]]],
 ["посчитай калории двести грамм гречки",[["гречка",200]]],

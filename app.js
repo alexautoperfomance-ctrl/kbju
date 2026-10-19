@@ -1,5 +1,5 @@
 'use strict';
-const VER='1.15.0';
+const VER='1.16.0';
 const $=s=>document.querySelector(s), R=Math.round, esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const MEALS=['завтрак','обед','ужин','перекус'], MI={завтрак:'🍳',обед:'🍲',ужин:'🍽️',перекус:'🍎'};
 const KEY='kbju.v1';
@@ -304,8 +304,8 @@ function renderItems(){ const el=$('#vres'); if(!el)return; if(!V.items.length){
    ${!it.food?`<div class="cands"><span class="mu">${it.cands&&it.cands.length?'Похожее: ':'В базе нет. '}</span>${(it.cands||[]).map((c,j)=>`<button class="chip" data-cand="${i}:${j}">${esc(c.n)}</button>`).join('')}<button class="chip" data-pick="${i}">найти / добавить…</button></div>`:''}
    ${it.unsure&&it.cands&&it.cands.length>1?`<div class="cands"><span class="mu">Точно? </span>${it.cands.map((c,j)=>`<button class="chip${j===0?' on':''}" data-cand="${i}:${j}">${esc(c.n)}</button>`).join('')}<button class="chip" data-pick="${i}">другое…</button></div>`:''}</div>`).join('')+
    `<div class="card" style="margin-top:6px"><div class="kv"><span>Итого</span><span><b>${R(t.k)}</b> ккал · ${chips(t)}</span></div><div class="row" style="margin-top:8px"><button class="btn sp" data-vsave="1">${rm?'Готово':'✅ Записать в дневник'}</button></div></div>` }
-let chainsP=null; function loadChains(){ return chainsP||(chainsP=new Promise((ok,no)=>{ const s=document.createElement('script'); s.src='chains.js'; s.onload=ok; s.onerror=()=>{chainsP=null;no()}; document.head.appendChild(s) })) }
-function doParse(text){ if(!self.CHAINS&&KP.chainIn(text)){ mst&&mst('Загружаю меню сети…'); loadChains().then(()=>doParse(text),()=>{ toast('Меню сетей не загрузилось — считаю по общей базе'); self.CHAINS=[]; doParse(text) }); return }
+const CHP={}; function loadChain(m){ return CHP[m.s]||(CHP[m.s]=Promise.all(m.f.map(f=>fetch('cdata/'+f).then(r=>{ if(!r.ok)throw new Error(r.status); return r.json() }))).then(parts=>KP.chainAdd(m,parts)).catch(e=>{ delete CHP[m.s]; throw e })) }
+function doParse(text){ const need=doParse.skip?[]:KP.chainNeeds(text); if(need.length){ mst&&mst('Загружаю '+need.map(m=>'«'+m.sh+'»').join(', ')+'…'); Promise.all(need.map(loadChain)).then(()=>{ mst&&mst(SR?'Нажми и говори':''); doParse(text) },()=>{ toast('Меню места не загрузилось — считаю по общей базе'); doParse.skip=true; try{doParse(text)}finally{doParse.skip=false} }); return }
   const mealSel=$('#vmeal')&&$('#vmeal').value;
   if(V.mode!=='recipe'){ const dsh=DICT.dish(text,Object.assign(dictOpt(),{meal:mealSel||V.meal||(cur===dk()?KP.defaultMeal():'обед')})); if(dsh){ if(mealSel)dsh.meal=mealSel; dsh.eat=null; dsh.rec=false; V.dish=dsh; V.items=[]; renderDish(); return } }
   V.dish=null; const r=KP.parse(text,{index:index(),meal:mealSel||V.meal||(cur===dk()?null:'обед')||KP.defaultMeal(),noMeals:V.mode==='recipe'||!!mealSel});
@@ -431,7 +431,7 @@ function openSources(){ const n=self.FOODS.length, c=k=>self.FOODS.filter(f=>f.d
   • Open Food Facts (ODbL), экспорт с фильтром «страна: Россия» — скачано; ${c('off-ru')} популярных упакованных продуктов с проверкой КБЖУ (Атуотер ±15%).</p>
   <p><b>Приготовление</b><br>• USDA Table of Cooking Yields for Meat and Poultry (2014) — выход мяса/птицы при варке, жарке, тушении, запекании, гриле.<br>• USDA SR Legacy: пары «сухой/отварной» — уварка круп, бобовых, макарон.<br>• USDA Table of Nutrient Retention Factors, Release 6 (2007) — сохранность витаминов и минералов.<br>• Впитывание масла при жарке — по нормам Сборника рецептур / USDA FNDDS.</p>
   <p><b>Микронутриенты</b>: USDA ${ms('u')} · производные ${ms('d')} · по рецептуре ${ms('r')} · по составу ${ms('c')} · OFF ${ms('o')} · оценка ${ms('e')}. Нормы — МР 2.3.1.0253-21.</p>
-  <p><b>Сети</b> (меню с официальных сайтов, 19.10.2026; назови сеть во фразе: «пепперони додо 2 куска», «цезарь из шоколадницы»):<br>${KP.CHAIN_META.map(m=>'• '+esc(m[1])+' — '+m[3]+' блюд').join('<br>')}<br><span class="mu">Где сеть публикует противоречивые цифры — берётся типичное значение блюда; у Шоколадницы Б/Ж/У оценены (сайт даёт только ккал).</span></p>
+  <p><b>Сети и магазины</b> (снимок 19.10.2026; назови место во фразе: «2 куска пепперони Додо», «чизбургер Вкусно и точка», «сырники ВкусВилл»). Данные грузятся только когда место названо и сохраняются для офлайна.<br>${KP.CHAIN_META.filter(m=>m[4]==='s').map(m=>'🛒 '+esc(m[1])+' — '+m[3]+' товаров').join('<br>')}<br>${KP.CHAIN_META.filter(m=>m[4]!=='s').map(m=>esc(m[2])+' '+m[3]).join(' · ')}<br><span class="mu">Строки с физически невозможными Б/Ж/У отброшены; где сеть публикует противоречивые цифры — берётся типичное; «только ккал» — Б/Ж/У оценены, это видно в карточке.</span></p>
   <p class="mu">Значения — справочные средние; конкретный продукт может отличаться. Для упакованных продуктов точнее этикетка или штрихкод.</p></div>`) }
 function edNote(o){ const f=fdb(o.name); if(o.note)return `<div class="mu" id="dnote" style="margin-top:4px">🍽 ${esc(o.note)}</div>`; if(!f||!f.rf)return '';
   const w=f.cat==='nut'?'ядра':/яйц/.test(f.n)?'без скорлупы':/fish|meat/.test(f.cat||'')?'без костей':'мякоти';

@@ -17,7 +17,7 @@ const UNITS=[[/^(г|гр|грамм\S*|граммов)$/,'g',1],[/^(кг|кил�
  [/^(горст\S*)$/,'g',30],[/^(щепот\S*)$/,'g',1],[/^(зубчик\S*|зубчиков)$/,'g',5],[/^половник\S*$/,'g',100],[/^плитк\S*$/,'g',100],
  [/^(бокал\S*|фужер\S*)$/,'g',150],[/^(рюмк\S*|рюмок|стопк\S*|стопок)$/,'g',50],[/^шот\S*$/,'g',40],[/^(ковш\S*)$/,'g',250],[/^(батон|батона|батоны|батонов|батоном)$/,'g',400],[/^(буханк\S*)$/,'g',600]];
 const SIZE={большой:1.4,большая:1.4,большое:1.4,большую:1.4,большие:1.4,больших:1.4,огромный:1.7,огромная:1.7,огромную:1.7,маленький:.7,маленькая:.7,маленькое:.7,маленькую:.7,маленьких:.7,небольшой:.75,небольшая:.75,небольшую:.75,средний:1,средняя:1,среднюю:1,полный:1,полную:1};
-const FILLER=new Set('я мы съел съела съели поел поела поели скушал скушала покушал покушала ел ела пил пила выпил выпила выпили сегодня был была были было потом затем еще также а ну вот так типа примерно около где-то где то еще и ещё плюс кроме того сначала после это у меня мне взял взяла заказал заказала приготовил приготовила сделал сделала перекусил'.split(' '));
+const FILLER=new Set('я мы съел съела съели поел поела поели скушал скушала покушал покушала ел ела пил пила выпил выпила выпили сегодня был была были было потом затем еще также а ну вот так типа примерно около где-то где то еще и ещё плюс кроме того сначала после это у меня мне взял взяла заказал заказала купил купила купили брал брала приготовил приготовила сделал сделала перекусил'.split(' '));
 const STOP=new Set('и с со в во на по из для к ко от до за под при о об а же'.split(' '));
 const SPOON_TSP=/^(чайн\S*|ч)$/, SPOON_TBSP=/^(столов\S*|ст)$/;
 const IRR={мой:'мой',моя:'мой',мое:'мой',мои:'мой',моего:'мой',моей:'мой',мою:'мой',моих:'мой',моим:'мой',моему:'мой',яиц:'яйц',яичк:'яйц',яичка:'яйц',яички:'яйц',чая:'чай',чаю:'чай',чаем:'чай',чаек:'чай',чайку:'чай',чайка:'чай',щей:'щи',щами:'щи',огурчик:'огурц',огурчика:'огурц',огурчики:'огурц',огурец:'огурц',
@@ -108,14 +108,27 @@ function parseChunk(index,ts){ // одна позиция: количество 
   if(num==null&&unit&&unit[1]==='g'&&/^(грамм|гр|г)/.test('')){}
   const text=food.join(' ').trim(); return {num,unit,size,tsp,text,whole,diam,thin} }
 function edibleWord(f){ return f&&f.cat==='nut'?'ядра':f&&/яйц/.test(f.n)?'без скорлупы':f&&/fish|meat/.test(f.cat||'')?'без костей':'мякоти' }
-// ---------- сети (меню с официальных сайтов; данные в chains.js грузятся лениво) ----------
+// ---------- сети (меню с официальных сайтов; индекс cdata/idx.js, данные cdata/*.json грузятся лениво) ----------
 const PRE='(^|\\s)(?:(?:из|в|во|от)\\s+)?';
-const CHAIN_RE=[['dodo-pizza',new RegExp(PRE+'(?:додо|dodo|додопицц\\S*)(?:\\s+пицц\\S*)?(?=\\s|$)')],['dens-pizza',new RegExp(PRE+"(?:денс\\S*|den'?s|dens|ден)(?:\\s+пицц\\S*)?(?=\\s|$)")],
- ['dominos-pizza',new RegExp(PRE+"(?:доминос\\S*|домино|dominos|domino'?s?)(?:\\s+пицц\\S*)?(?=\\s|$)")],['subjoy',new RegExp(PRE+'(?:сабджо\\S*|subjoy|сабвей\\S*|subway)(?=\\s|$)')],
- ['mu-mu',new RegExp(PRE+'(?:му-му|муму|mu-mu|mumu|му\\s+му)(?=\\s|$)')],['yakitoriya',new RegExp(PRE+'(?:якитори\\S*|yakitoriya)(?=\\s|$)')],['shokoladnitsa',new RegExp(PRE+'(?:шоколадниц\\S*|шоко|shoko\\S*)(?=\\s|$)')]];
-const CHAIN_META=[["dodo-pizza", "Додо Пицца", "Додо", 146], ["dens-pizza", "Den's Pizza (Новосибирск)", "Den's", 51], ["dominos-pizza", "Domino's Pizza", "Доминос", 130], ["subjoy", "Сабджой", "Сабджой", 51], ["mu-mu", "Му-Му", "Му-Му", 231], ["yakitoriya", "Якитория", "Якитория", 194], ["shokoladnitsa", "Шоколадница", "Шоколадница", 153]];
-function chainDetect(t){ for(const [slug,re] of CHAIN_RE){ const m=re.exec(t); if(m)return {slug,rest:t.slice(0,m.index)+(m[1]||'')+' '+t.slice(m.index+m[0].length)} } return null }
+// сети/магазины: алиасы из cdata/idx.js (G.CHAIN_IDX), данные подгружаются лениво в G.CHAINS
+const esc=x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+let CRX=null, CRX_SRC=null;
+function chainRx(){ const I=G.CHAIN_IDX||[]; if(CRX&&CRX_SRC===I)return CRX; const L=[];
+  I.forEach(m=>(m.a||[]).forEach(([a,amb])=>{ const w=a.split(' ').map(esc); const last=w.length-1; if(/[а-я]{4,}$/.test(a))w[last]=w[last].replace(/[аяоеиыуюйь]$/,'')+'[а-я]{0,3}';
+    const body=w.join('[\\s-]+'); const re=amb?new RegExp('(^|\\s)(?:(?:в|во|из|от)\\s+|(?:кафе|ресторан\\S*|магазин\\S*|сет\\S*)\\s+)'+body+'(?:\\s+пицц\\S*)?(?=[\\s,;.]|$)'):new RegExp(PRE+body+'(?:\\s+пицц\\S*)?(?=[\\s,;.]|$)'); L.push([a.length+(amb?0:.5),m,re]) }));
+  L.sort((x,y)=>y[0]-x[0]); CRX_SRC=I; return CRX=L }
+function chainDetect(t){ for(const [,m,re] of chainRx()){ const x=re.exec(t); if(x)return {slug:m.s,meta:m,i:x.index,len:x[0].length,rest:t.slice(0,x.index)+(x[1]||'')+' '+t.slice(x.index+x[0].length)} } return null }
 function chainIn(text){ return !!chainDetect(norm(text)) }
+function chainLoaded(slug){ return (G.CHAINS||[]).some(c=>c.slug===slug) }
+function chainAll(t){ const out=[]; let rest=t; for(let k=0;k<4;k++){ const d=chainDetect(rest); if(!d)break; out.push(d); rest=d.rest } return out }
+function chainNeeds(text){ const seen={}; return chainAll(norm(text)).map(d=>d.meta).filter(m=>!chainLoaded(m.s)&&!seen[m.s]&&(seen[m.s]=1)) }
+function chainNeed(text){ return chainNeeds(text)[0]||null }
+// данные: сеть — {slug,name,short,items}; магазин — шарды {rows:[[name,k,p,f,c,g,fl]]} (fl: 1 мл, 2 только ккал)
+function chainAdd(meta,parts){ G.CHAINS=G.CHAINS||[]; if(chainLoaded(meta.s))return; let C;
+  if(meta.k==='s'){ const items=[]; parts.forEach(pt=>pt.rows.forEach(r=>{ const v={l:'',k:r[1]}; if(r[6]&2)v.est=1; else {v.p=r[2];v.f=r[3];v.c=r[4]} if(r[5])v.g=r[5]; if(r[6]&1)v.ml=1; items.push({n:r[0],cat:'',u:'',v:[v]}) }));
+    C={slug:meta.s,name:meta.n,short:meta.sh,store:true,items} } else C=parts[0];
+  G.CHAINS.push(C); delete CIDX[meta.s] }
+const CHAIN_META=()=>(G.CHAIN_IDX||[]).map(m=>[m.s,m.n,m.sh,m.c,m.k]);
 let CUR_CHAIN=null; const CIDX={};
 function chainIndex(slug){ if(CIDX[slug])return CIDX[slug]; const C=(G.CHAINS||[]).find(c=>c.slug===slug); if(!C)return null;
   const foods=C.items.map(it=>{ const n=it.n.toLowerCase().replace(/[«»"]/g,''); const short=n.replace(/^(пицца|сэндвич|салат|суп|ролл|роллы|напиток|десерт)\s+/,''); return {n,s:short!==n?[short]:[],_it:it} });
@@ -129,9 +142,10 @@ function chainFood(C,it,ch,index){ let vs=it.v, v=vs[0];
   let k=v.k,p=v.p,f=v.f,c=v.c,cnote='';
   if(v.bad||v.est){ const g=genericFor(index,it.n);
     if(v.bad&&g){ k=g.k;p=g.p;f=g.f;c=g.c; cnote='данные сети ошибочны, взято типичное' }
-    else { const e=g?[4*g.p,9*g.f,4*g.c]:[60,105,135], s=e[0]+e[1]+e[2]||1; p=Math.round(k*e[0]/s/4*10)/10; f=Math.round(k*e[1]/s/9*10)/10; c=Math.round(k*e[2]/s/4*10)/10; cnote=v.bad?'данные сети противоречивы — Б/Ж/У оценены':'Б/Ж/У оценены (сеть публикует только ккал)' } }
+    else { const e=g?[4*g.p,9*g.f,4*g.c]:[60,105,135], s=e[0]+e[1]+e[2]||1; p=Math.round(k*e[0]/s/4*10)/10; f=Math.round(k*e[1]/s/9*10)/10; c=Math.round(k*e[2]/s/4*10)/10; cnote=v.bad?'данные сети противоречивы — Б/Ж/У оценены':C.store?'в источнике только ккал — Б/Ж/У оценены':'Б/Ж/У оценены (сеть публикует только ккал)' } }
   const pz=v.d&&(/пицц/i.test(it.cat+' '+it.n)||(/pizza/.test(C.slug)&&v.d>=20&&!/напит|соус|десерт|закуск/i.test(it.cat)));
-  const food={n:it.n+(v.d?' '+v.d+' см':'')+(v.t?', тонкое':'')+' ('+C.short+')',k,p,f,c,cat:'chain',src:'chain',url:it.u,chain:C.short,cnote,po:v.g||250}; if(v.ml)food.ml=1;
+  const food={n:it.n+(v.d?' '+v.d+' см':'')+(v.t?', тонкое':'')+' ('+C.short+')',k,p,f,c,cat:'chain',src:'chain',url:it.u,chain:C.short,cnote,po:C.store&&v.g>300?300:v.g||250}; if(v.ml)food.ml=1;
+  if(!pz&&!v.d&&v.g>=250&&!v.ml&&/пицц/i.test(it.n+' '+it.cat)&&!/напит|соус|десерт/i.test(it.cat)){ const d=Math.max(20,Math.min(40,Math.round(30*Math.sqrt(v.g/520)))); food.pizza=true; food.pz={[d]:v.g}; food.pzd=d; return food }
   if(pz){ food.pizza=true; food.pz={[v.d]:v.g||Math.round(520*(v.d/30)**2)}; food.pzd=v.d; if(v.sl)food.pzsl=v.sl } else if(v.g&&!v.ml) food.pc=v.g;
   return food }
 // пицца: вес целой по диаметру (pz у брендов, иначе 520 г на 30 см — Den's Pizza «Пепперони» — по площади), кусков: <20 см — 4, <25 — 6, иначе 8; тонкое тесто ×0.75
@@ -144,8 +158,13 @@ function suggest(index,text,n){ const tg=w=>{w='  '+w+' ';const s=new Set();for(
   for(const it of index){ if(it.f.src==='offru')continue; let b=0; [it.f.n].concat(it.f.s||[]).forEach(nm=>{ const t=tg(String(nm).toLowerCase().replace(/ё/g,'е')); let c=0; q.forEach(x=>{if(t.has(x))c++}); const v=2*c/(q.size+t.size); if(v>b)b=v }); if(b>=.3)out.push([b,it.f]) }
   return out.sort((a,b)=>b[0]-a[0]).slice(0,n||3).map(x=>x[1]) }
 function insane(f){ const C=G.COOK||(typeof require!=='undefined'?(()=>{try{return require('./cook.js')}catch(e){return null}})():null); const b=C&&f&&C.sane(f,f.cat,f.n); if(b&&typeof console!=='undefined')console.warn('[kbju] неправдоподобные БЖУ, пропускаю:',f.n,b); return b }
-function resolve(index,ch,raw,meal){ let alts=search(index,ch.text,6).filter(a=>!insane(a.food)); const cm=CUR_CHAIN?chainMatch(CUR_CHAIN,ch,index):null; if(cm)alts=[{food:cm.food,score:999,full:true,all:true,fz:0}].concat(cm.alts.map(f=>({food:f,score:1,fz:0}))); const best=alts[0]||null; const food=best&&best.food;
+function resolve(index,ch,raw,meal){ let alts=search(index,ch.text,6).filter(a=>!insane(a.food)); let cm=CUR_CHAIN?chainMatch(CUR_CHAIN,ch,index):null, gen0=alts[0]&&alts[0].food;
+  if(CUR_CHAIN&&!cm&&gen0)for(const nm0 of [gen0.n].concat(gen0.s||[]).slice(0,4)){ cm=chainMatch(CUR_CHAIN,Object.assign({},ch,{text:nm0}),index); if(cm)break }
+  const chMiss=CUR_CHAIN&&!cm; if(cm)alts=[{food:cm.food,score:999,full:true,all:true,fz:0}].concat(cm.alts.map(f=>({food:f,score:1,fz:0}))); const best=alts[0]||null; const food=best&&best.food;
   let g=grams(food,ch.num,ch.unit,ch.size,ch.tsp), note='';
+  if(chMiss&&food){ const cc=(G.CHAINS||[]).find(c=>c.slug===CUR_CHAIN); note='в меню «'+(cc?cc.short:CUR_CHAIN)+'» не нашлось — взято типичное' }
+  // «9 наггетсов» из сетевой коробки: количество — штуки, а не коробки
+  if(cm&&food&&food.pc>=100&&ch.num>=4&&(!ch.unit||/^pcs?$/.test(ch.unit[1]))&&gen0&&gen0.pc&&gen0.pc<60){ g=Math.round(ch.num*gen0.pc); note=ch.num+' шт × '+gen0.pc+' г = '+g+' г' }
   const pcs=food&&food.pc&&(!ch.unit||/^pcs?$/.test(ch.unit[1]))&&!(ch.num>=20&&!ch.unit);
   if(food&&food.rf&&ch.whole&&!pcs){ const g0=g; g=Math.max(1,Math.round(g*(1-food.rf/100))); note=g0+' г целиком ≈ '+g+' г '+edibleWord(food) }
   else if(food&&food.rf&&pcs){ const n=Math.round((ch.num==null?1:ch.num)*10)/10; note=n+' шт ≈ '+g+' г '+edibleWord(food) }
@@ -186,7 +205,12 @@ function segment(index,ws){ const n=ws.length; if(n<2||n>14)return null; const o
   const out=segs.map(x=>ws.slice(x[0],x[1]).concat((x.q||[]).map(i=>ws[i])).join(' ')); out.r=segs; return out }
 function chunkHasQty(ts){ return ts.some((t,i)=>readNum(ts,i)||unitOf(t)) }
 function parse(text,opt){ opt=opt||{}; const index=opt.index||makeIndex(opt.foods||[],opt.recipes||[]);
-  let nt=norm(text); const chd=chainDetect(nt); CUR_CHAIN=chd&&G.CHAINS?chd.slug:null; if(chd)nt=chd.rest; nt=speech(nt);
+  // несколько мест в одной фразе: «пепперони додо, чизбургер вкусно и точка» — каждое место к своей части
+  if(!opt._one){ const n0=norm(text), all=chainAll(n0); if(new Set(all.map(d=>d.slug)).size>1){ let ph=n0; const keep=[]; for(let k=0;k<4;k++){ const d=chainDetect(ph); if(!d)break; keep.push(ph.substr(d.i,d.len)); ph=ph.slice(0,d.i)+' §'+(keep.length-1)+'§ '+ph.slice(d.i+d.len) }
+      const cl=ph.split(/\s*[,;]\s*|\s+и\s+(?=\S)/).map(c=>c.replace(/§(\d+)§/g,(m0,k)=>keep[+k])).filter(x=>x.trim()); if(0)n0.split(/\s*[,;]\s*|\s+и\s+(?=\S)/).filter(x=>x.trim()); const groups=[]; let cur=null;
+      cl.forEach(c=>{ const has=!!chainDetect(' '+c+' '); if(!cur||has&&cur.has){ cur={t:[],has:false}; groups.push(cur) } cur.t.push(c); if(has)cur.has=true });
+      if(groups.length>1){ let res=[]; const o2=Object.assign({},opt,{index,_one:true}); groups.forEach(g=>{ res=res.concat(parse(g.t.join(', '),o2)) }); return res } } }
+  let nt=norm(text); const chd=chainDetect(nt); CUR_CHAIN=chd&&chainLoaded(chd.slug)?chd.slug:null; if(chd)nt=chd.rest; nt=speech(nt);
   const ts0=(nt.replace(/(^|\s)(с|со|в)\s+(кожур|кожиц|шкурк|скорлуп)[а-я]*/g,' целиком').replace(/[,;]/g,' , ').match(/[a-zа-я0-9.%-]+|,/g)||[]);
   for(let i=0;i<ts0.length;i++){ const r=readNum(ts0,i); if(r&&/^процент/.test(ts0[r.j]||'')){ ts0.splice(i,r.j-i+1,r.v+'%') } }
   const segs=opt.noMeals?[{meal:opt.meal||null,ts:ts0}]:splitMeals(ts0,opt.meal||defaultMeal(opt.now));
@@ -216,6 +240,6 @@ function parse(text,opt){ opt=opt||{}; const index=opt.index||makeIndex(opt.food
       res.push(r) } }
   res.forEach(r=>{ if(r.food&&r.num==null&&!r.unit&&!r.note)r.note='вес не назван — порция '+Math.round(r.g)+' г' });
   return res }
-const P={chainIn,CHAIN_META,parse,search,makeIndex,tokens,stem,norm,grams,nutr,defaultMeal,readNum};
+const P={chainIn,chainNeed,chainNeeds,chainAdd,chainLoaded,chainDetect,get CHAIN_META(){return CHAIN_META()},parse,search,makeIndex,tokens,stem,norm,grams,nutr,defaultMeal,readNum};
 if(typeof module!=='undefined'&&module.exports)module.exports=P; else G.KP=P;
 })(typeof self!=='undefined'?self:this);

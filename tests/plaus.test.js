@@ -1,6 +1,6 @@
 // node tests/plaus.test.js — правдоподобие: ~150 типичных фраз → ожидаемый диапазон ккал (сумма по фразе).
 // Диапазоны — по справочникам РФ (Скурихин/Тутельян), USDA, данным сетей (Додо, Den's Pizza) и типичным значениям calorizator/fatsecret RU для указанного веса/порции.
-global.self=global; require('../db.js'); require('../chains.js'); const P=require('../parser.js'); const ix=P.makeIndex(self.FOODS,[]);
+global.self=global; require('../db.js'); require('./chains_node.js'); const P=require('../parser.js'); const ix=P.makeIndex(self.FOODS,[]);
 const C=[
 // мясо / птица / рыба
 ['свиная вырезка готовая 300 г',420,480],['свинина 300 г',540,660],['говядина 200 г',400,500],['куриная грудка 200 г',200,320],['куриная грудка отварная 150 г',200,260],
