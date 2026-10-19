@@ -25,8 +25,16 @@ function recipe(ings,meth,K,cooked){ meth=meth||'raw'; const liq=ings.some(i=>/^
     if(meth==='fry'&&!hasOil&&gr!=='other'&&!COOKED.test(i.n)) oil+=g*(OIL[gr].fry||0)/100;
     w+=g*y; k+=(i.k*g/100)-(i.f*g/100*(1-fr))*9; p+=i.p*g/100; f+=i.f*g/100*fr; c+=i.c*g/100;
     if(i.m) i.m.forEach((x,j)=>m[j]+=(+x||0)*g/100*(rt[K[j]]==null?1:rt[K[j]])) });
-  f+=oil*.98; k+=oil*.98*9; w+=oil*.98; const W=cooked||w||1;
-  return {cooked:Math.round(w),k:k/W*100,p:p/W*100,f:f/W*100,c:c/W*100,m:m.map(x=>x/W*100),oil:Math.round(oil)} }
-const M={YIELD,FATRET,OIL,WATER,RET,METH,group,recipe};
+  f+=oil*.98; k+=oil*.98*9; w+=oil*.98;
+  // защита: взвешенный выход вне 0.4…2.5 от расчётного (устаревшее поле «выход», граммы вместо порций) → расчётный выход
+  let W=cooked||w||1, warn=''; if(cooked&&w>0&&(cooked<w*.4||cooked>w*2.5)){ warn='выход '+cooked+' г неправдоподобен (расчёт '+Math.round(w)+' г)'; W=w }
+  let o={cooked:Math.round(cooked&&!warn?cooked:w),k:k/W*100,p:p/W*100,f:f/W*100,c:c/W*100,m:m.map(x=>x/W*100),oil:Math.round(oil)};
+  const bad=sane(o); if(bad&&W!==w&&w>0){ W=w; warn=bad; o={cooked:Math.round(w),k:k/W*100,p:p/W*100,f:f/W*100,c:c/W*100,m:m.map(x=>x/W*100),oil:Math.round(oil)} }
+  if(warn){ o.warn=warn; if(typeof console!=='undefined')console.warn('[cook]',warn) } return o }
+// физические пределы на 100 г: Б ≤ 90 (мясо/птица/рыба ≤ 35 сырое, ≤ 40 готовое), Б+Ж+У ≤ 100 г, ккал ≈ 4Б+9Ж+4У (Этуотер)
+function sane(x,cat,name){ name=String(name||x.n||'').toLowerCase(); const p=+x.p||0,f=+x.f||0,c=+x.c||0,k=+x.k||0; if(p<0||f<0||c<0||k<0)return 'отрицательные значения';
+  if(p>(/meat|fish|poultry/.test(cat||'')&&!/чипс|вял|сушен|сушён|джерк|снек|протеин|порош|сух/.test(name)?40:90))return 'белок '+p.toFixed(1)+' г/100 г'; if(f>100||c>100||p+f+c>101)return 'Б+Ж+У '+(p+f+c).toFixed(0)+' г/100 г';
+  const a=4*p+9*f+4*c, alc=/ликер|ликёр|коктейл|вино|пиво|водк|коньяк|виски|ром|джин|глинтвейн|по-ирландски|сидр|шампан|настойк|бальзам|текил|сок|сушен|сушён|отруб|клетчат/.test(name); if(a>30&&!alc&&(k>a*1.5+40||k<a*.5-40))return 'Этуотер: '+Math.round(k)+' ккал vs '+Math.round(a); return '' }
+const M={YIELD,FATRET,OIL,WATER,RET,METH,group,recipe,sane};
 if(typeof module!=='undefined'&&module.exports)module.exports=M; else G.COOK=M;
 })(typeof self!=='undefined'?self:this);

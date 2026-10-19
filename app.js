@@ -1,5 +1,5 @@
 'use strict';
-const VER='1.14.0';
+const VER='1.15.0';
 const $=s=>document.querySelector(s), R=Math.round, esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const MEALS=['завтрак','обед','ужин','перекус'], MI={завтрак:'🍳',обед:'🍲',ужин:'🍽️',перекус:'🍎'};
 const KEY='kbju.v1';
@@ -306,9 +306,35 @@ function renderItems(){ const el=$('#vres'); if(!el)return; if(!V.items.length){
    `<div class="card" style="margin-top:6px"><div class="kv"><span>Итого</span><span><b>${R(t.k)}</b> ккал · ${chips(t)}</span></div><div class="row" style="margin-top:8px"><button class="btn sp" data-vsave="1">${rm?'Готово':'✅ Записать в дневник'}</button></div></div>` }
 let chainsP=null; function loadChains(){ return chainsP||(chainsP=new Promise((ok,no)=>{ const s=document.createElement('script'); s.src='chains.js'; s.onload=ok; s.onerror=()=>{chainsP=null;no()}; document.head.appendChild(s) })) }
 function doParse(text){ if(!self.CHAINS&&KP.chainIn(text)){ mst&&mst('Загружаю меню сети…'); loadChains().then(()=>doParse(text),()=>{ toast('Меню сетей не загрузилось — считаю по общей базе'); self.CHAINS=[]; doParse(text) }); return }
-  const mealSel=$('#vmeal')&&$('#vmeal').value; const r=KP.parse(text,{index:index(),meal:mealSel||V.meal||(cur===dk()?null:'обед')||KP.defaultMeal(),noMeals:V.mode==='recipe'||!!mealSel});
+  const mealSel=$('#vmeal')&&$('#vmeal').value;
+  if(V.mode!=='recipe'){ const dsh=DICT.dish(text,Object.assign(dictOpt(),{meal:mealSel||V.meal||(cur===dk()?KP.defaultMeal():'обед')})); if(dsh){ if(mealSel)dsh.meal=mealSel; dsh.eat=null; dsh.rec=false; V.dish=dsh; V.items=[]; renderDish(); return } }
+  V.dish=null; const r=KP.parse(text,{index:index(),meal:mealSel||V.meal||(cur===dk()?null:'обед')||KP.defaultMeal(),noMeals:V.mode==='recipe'||!!mealSel});
   r.forEach(x=>{ if(!x.meal)x.meal=mealSel||V.meal||KP.defaultMeal(); if(mealSel)x.meal=mealSel }); V.items=V.items.concat(r); renderItems();
   if(!r.length)toast('Не понял. Попробуй: «200 грамм гречки»') }
+// ---- 🍲 блюдо из диктовки: одна карточка, ингредиенты галочками ----
+function dishCalcV(){ const d=V.dish, x=DICT.dishCalc(d,COOK,MK); d.calc=x; const eat=d.eat==null?x.cooked:Math.min(d.eat,x.cooked||d.eat); d.eatG=eat; const m=eat/100; d.part={k:x.k*m,p:x.p*m,f:x.f*m,c:x.c*m}; return x }
+function dishSum(){ const d=V.dish, x=d.calc, pt=d.part, whole=d.eat==null||d.eatG>=x.cooked;
+  return `<div class="kv"><span>Готово ≈ <b>${R(x.cooked)} г</b></span><span class="mu">сырых ${R(x.raw)} г${x.oil?' + масло '+x.oil+' г':''}</span></div>
+  <div class="kv"><span>Всё блюдо</span><span><b>${R(x.tot.k)}</b> ккал · ${chips(x.tot)}</span></div>
+  <div class="kv mu"><span>на 100 г</span><span>${R(x.k)} ккал · Б ${R1(x.p)} · Ж ${R1(x.f)} · У ${R1(x.c)}</span></div>
+  ${whole?'':`<div class="kv"><span>Порция ${R(d.eatG)} г</span><span><b>${R(pt.k)}</b> ккал · ${chips(pt)}</span></div>`}` }
+const R1=v=>Math.round(v*10)/10;
+function renderDish(){ const el=$('#vres'); if(!el)return; const d=V.dish; dishCalcV();
+  el.innerHTML=`<div class="pi dish"><input id="xn" value="${esc(d.name)}" style="font-weight:700;width:100%">
+   <div class="row" style="margin-top:4px;gap:6px"><select id="xm">${COOK.METH.map(([k,t])=>`<option value="${k}" ${d.meth===k?'selected':''}>${t}</option>`).join('')}</select><select id="xmeal">${MEALS.map(m=>`<option ${d.meal===m?'selected':''}>${m}</option>`).join('')}</select></div>
+   <div id="xsum" style="margin-top:4px">${dishSum()}</div>
+   <div class="mu" style="margin-top:4px">Ингредиенты (сырой вес):</div>
+   ${d.ings.map((i,j)=>`<div class="xi"><label><input type="checkbox" data-xon="${j}" ${i.on!==false?'checked':''}> ${esc(i.n)}</label><input type="number" inputmode="numeric" data-xg="${j}" value="${R(i.g)}"><span class="mu">г${i.est?' ≈':''}</span></div>`).join('')}
+   ${d.unk.length?`<div class="mu" style="color:var(--red)">Не нашлось: ${d.unk.map(esc).join(', ')}</div>`:''}
+   <div class="xi" style="margin-top:6px"><label>Съел, г (пусто — всё)</label><input type="number" inputmode="numeric" id="xeat" value="${d.eat==null?'':R(d.eat)}" placeholder="${R(d.calc.cooked)}"><span></span></div>
+   <label class="ck mu" style="margin-top:4px"><input type="checkbox" id="xrec" ${d.rec?'checked':''}> сохранить как рецепт</label>
+   <div class="row" style="margin-top:6px"><button class="btn sp" data-xsave="1">✅ Записать</button></div></div>` }
+function dishSave(){ const d=V.dish, x=dishCalcV(); if(!x.cooked){ toast('Нет ингредиентов'); return } const on=d.ings.filter(i=>i.on!==false&&i.g>0), g=R(d.eatG), pt=d.part;
+  const mt=(COOK.METH.find(z=>z[0]===d.meth)||[0,d.meth])[1];
+  const L=S.days[cur]=day(cur).slice(); L.push({id:uid(),meal:d.meal,name:d.name,g,k:R(pt.k),p:R1(pt.p),f:R1(pt.f),c:R1(pt.c),k100:R1(x.k),p100:R1(x.p),f100:R1(x.f),c100:R1(x.c),cat:'dish',src:'dish',m100:x.m&&x.m.length?x.m:undefined,
+    note:mt+': '+on.map(i=>i.n+' '+R(i.g)+' г').join(', ')+' → готового ≈'+R(x.cooked)+' г'+(g<x.cooked?' · съедено '+g+' г':''),dish:{meth:d.meth,cooked:R(x.cooked),ings:on.map(i=>({n:i.n,g:R(i.g)}))}});
+  if(d.rec&&!S.recipes.some(r=>r.name===d.name)){ S.recipes.push({id:uid(),name:d.name,syn:[],meth:d.meth,yield:R(x.cooked),yw:false,servings:1,ings:on.map(i=>({n:i.n,g:R(i.g),k:i.k,p:i.p,f:i.f,c:i.c,cat:i.cat||'',m:i.m||undefined}))}); IX=null }
+  save(); dirty(); closeSheet(); render(); toast(`Записано: ${d.name} ${g} г · ${R(pt.k)} ккал`+(d.rec?' · рецепт сохранён':'')) }
 function recalc(it){ if(it.food)Object.assign(it,KP.nutr(it.food,it.g)) }
 // Микрофон-переключатель (iOS-устойчивый): 1-е нажатие — старт, 2-е — ВСЕГДА стоп.
 // Сессии continuous=false; управляемый перезапуск, пока пользователь не нажал «стоп» (лимит + backoff).
@@ -376,11 +402,11 @@ function openRecipe(r){ if(r)RE=JSON.parse(JSON.stringify(r)); if(!RE)RE={id:uid
   <h3>Ингредиенты</h3>${RE.ings.map((i,k)=>`<div class="it"><div class="n"><div>${esc(i.n)}</div><div class="mu">${R(i.k*i.g/100)} ккал</div></div><input style="width:80px" type="number" inputmode="numeric" data-rg="${k}" value="${R(i.g)}"><span class="mu">г</span><button data-rdel="${k}">✕</button></div>`).join('')||'<div class="mu">Пока пусто</div>'}
   <div class="row" style="margin-top:6px"><button class="btn s sp" data-radd="1">＋ Ингредиент</button><button class="btn s sp" data-rvoice="1">🎙️ Надиктовать</button></div>
   <div class="g2"><div><label>Способ приготовления</label><select id="rm">${COOK.METH.map(([k,t])=>`<option value="${k}" ${(RE.meth||'raw')===k?'selected':''}>${t}</option>`).join('')}</select></div><div><label>Порций</label><input id="rs" type="number" inputmode="numeric" value="${RE.servings}"></div></div>
-  <div class="g2"><div><label>Выход готового, г ${RE.yw?'<span class="mu">(взвешено)</span>':'<span class="mu">(расчёт)</span>'}</label><input id="ry" type="number" inputmode="numeric" value="${R(n.y)}"></div><div style="align-self:end">${RE.yw?'<button class="btn s sm" data-ryreset="1">↺ по расчёту</button>':''}</div></div>
+  <div class="g2"><div><label>Выход готового, г ${RE.yw?'<span class="mu">(взвешено)</span>':'<span class="mu">(расчёт)</span>'}</label><input id="ry" type="number" inputmode="numeric" value="${R(n.y)}" data-v="${R(n.y)}"></div><div style="align-self:end">${RE.yw?'<button class="btn s sm" data-ryreset="1">↺ по расчёту</button>':''}</div></div>
   <div class="mu">Сырые ингредиенты: ${R(raw)} г → готовое ≈ ${R(n.cooked)} г${n.oil?` (+${n.oil} г впитанного масла)`:''} по коэффициентам USDA. Взвесил готовое — впиши свой вес.</div>
   <div class="card" style="margin-top:8px"><div class="kv"><span>на 100 г</span><span><b>${R(n.k)}</b> ккал · ${chips(n)}</span></div><div class="kv"><span>на порцию</span><span><b>${R(n.k*n.y/Math.max(1,RE.servings)/100)}</b> ккал</span></div></div>
   <div class="row"><button class="btn sp" data-rsave="1">Сохранить</button>${RE._new?'':'<button class="btn r" data-rremove="1">Удалить</button>'}</div>`) }
-function syncRecipe(){ const n=$('#rn'); if(!n)return; RE.name=n.value.trim(); if(RE.yw===undefined)RE.yw=!!RE.yield; if($('#rm'))RE.meth=$('#rm').value; const y=+$('#ry').value||0; if(y&&Math.abs(y-recipeNut(RE).y)>=1){RE.yield=y;RE.yw=true} RE.servings=Math.max(1,+$('#rs').value||1); document.querySelectorAll('[data-rg]').forEach(x=>RE.ings[+x.dataset.rg].g=+x.value||0) }
+function syncRecipe(){ const n=$('#rn'); if(!n)return; RE.name=n.value.trim(); if(RE.yw===undefined)RE.yw=!!RE.yield; if($('#rm'))RE.meth=$('#rm').value; const ry=$('#ry'), y=ry?+ry.value||0:0; /* только если пользователь сам изменил поле — иначе старый расчётный выход «залипал» и делил БЖУ (100 г вырезки → 105 г белка) */ if(y&&ry.value!==ry.dataset.v&&Math.abs(y-recipeNut(RE).y)>=1){RE.yield=y;RE.yw=true} RE.servings=Math.max(1,+$('#rs').value||1); document.querySelectorAll('[data-rg]').forEach(x=>RE.ings[+x.dataset.rg].g=+x.value||0) }
 // ---------- запись ----------
 // Детали порции: КБЖУ, клетчатка, сахара, все витамины/минералы с % нормы
 function detailHtml(name,g,f100,m100){ const nm=MICROS.norms(S.prof), k=MK, n=KP.nutr(f100,g), m=m100||microOf(name);
@@ -430,7 +456,7 @@ document.addEventListener('click',e=>{ const mr=e.target.closest('[data-mic]'); 
   if(t.id==='prev'||t.id==='next'){cur=addD(cur,t.id==='prev'?-1:1);render();return}
   if(t.id==='fab'){openVoice();return} if(d.addm){openVoice(d.addm);return}
   if(d.close){closeSheet();return} if(d.close2){scanStop&&scanStop();closeSheet(2);return}
-  if(d.mict){ const act=d.mica; micStart(d.mict,t,v=>{ if(act==='parse'){ if(v){V.items=[];doParse(v)} } else if(act==='dict'){ if(v)dictRun(v) } else if(act==='search'){ showRes() } }); return } if(t.id==='vparse'){ const v=$('#vt').value; if(v.trim()){V.items=[];doParse(v)} return }
+  if(d.mict){ const act=d.mica; micStart(d.mict,t,v=>{ if(act==='parse'){ if(v){V.items=[];doParse(v)} } else if(act==='dict'){ if(v)dictRun(v) } else if(act==='search'){ showRes() } }); return } if(d.xsave&&V&&V.dish){ dishSave(); return } if(t.id==='vparse'){ const v=$('#vt').value; if(v.trim()){V.items=[];doParse(v)} return }
   if(d.idel){V.items.splice(+d.idel,1);renderItems();return}
   if(d.pick){ const i=+d.pick, it=V.items[i]; openPicker(it.food?'':it.text,f=>{it.food=f; it.unsure=false; it.note=''; if(!it.num&&!it.unit)it.g=KP.grams(f,null,null,1); recalc(it); renderItems()},it.alts); return }
   if(d.cand){ const [i,j]=d.cand.split(':').map(Number), it=V.items[i], f=it.cands[j]; it.food=f; it.unsure=false; if(!(it.unit==='g'||(it.num>=20&&!it.unit)))it.g=KP.grams(f,it.num,it.unit?[0,it.unit,1]:null,1)||it.g; it.note=''; recalc(it); renderItems(); return }
@@ -465,6 +491,7 @@ document.addEventListener('click',e=>{ const mr=e.target.closest('[data-mic]'); 
 });
 function readProf(){ const p=S.prof; p.sex=$('#cs').value; p.a=+$('#ca').value||p.a; p.w=+$('#cw').value||p.w; p.h=+$('#ch').value||p.h; p.act=+$('#cact').value; p.goal=$('#cg').value }
 document.addEventListener('input',e=>{ const t=e.target,d=t.dataset;
+  if(V&&V.dish&&(d.xg!=null||t.id==='xeat'||t.id==='xn')){ const D=V.dish; if(t.id==='xn'){D.name=t.value;D.auto=false;return} if(d.xg!=null){D.ings[+d.xg].g=+t.value||0;D.ings[+d.xg].est=false} else D.eat=t.value===''?null:+t.value||0; dishCalcV(); $('#xsum').innerHTML=dishSum(); const xe=$('#xeat'); if(xe)xe.placeholder=R(D.calc.cooked); return }
   if(d.ig!=null){ const it=V.items[+d.ig]; it.g=+t.value||0; it.note=''; const nt=t.closest('.pi').querySelector('.inote'); if(nt)nt.remove(); recalc(it); const top=t.closest('.pi').querySelector('.top b'); if(top&&it.food)top.textContent=R(it.k)+' ккал'; const cm=t.closest('.pi').querySelector('.mu[style]'); if(cm&&it.food)cm.innerHTML=chips(it)+' <span>«'+esc(it.raw)+'»</span>'; const tt=tot(V.items.filter(i=>i.food)), kv=$('#vres .card .kv span:last-child'); if(kv)kv.innerHTML='<b>'+R(tt.k)+'</b> ккал · '+chips(tt); return }
   if(t.id==='dg'&&DT){ DT.g=+t.value||0; $('#dbody').innerHTML=detailHtml(DT.name,DT.g,DT.f100,DT.m100); return }
   if(t.id==='pq'){ clearTimeout(showRes.t); showRes.t=setTimeout(()=>showRes(),120); return }
@@ -474,7 +501,7 @@ document.addEventListener('input',e=>{ const t=e.target,d=t.dataset;
   if(t.id==='smicdbg'){S.set.micdbg=t.checked;save();const el=$('#micdbg');if(el){el.style.display=t.checked?'block':'none';el.textContent=t.checked?'🎙 отладка включена — нажми микрофон':''}return}
 });
 document.addEventListener('toggle',e=>{ const t=e.target; if(!t.classList)return; if(t.classList.contains('nutri')){S.set.nutriOpen=t.open;save()} else if(t.dataset&&t.dataset.k){S.set[t.dataset.k]=t.open;save()} },true);
-document.addEventListener('change',e=>{ const t=e.target,d=t.dataset; if(t.id==='rm'&&RE){ syncRecipe(); openRecipe(); return } if(d.dg!=null||d.dmeal!=null){ dictEdit(t); return } if(tab==='menu'&&menuChange(t))return; if(d.imeal!=null){V.items[+d.imeal].meal=t.value;return}
+document.addEventListener('change',e=>{ const t=e.target,d=t.dataset; if(V&&V.dish&&(d.xon!=null||t.id==='xm'||t.id==='xmeal'||t.id==='xrec')){ const D=V.dish; if(d.xon!=null){D.ings[+d.xon].on=t.checked; if(D.auto)D.name=DICT.dishName(D.ings)} if(t.id==='xm')D.meth=t.value; if(t.id==='xmeal')D.meal=t.value; if(t.id==='xrec'){D.rec=t.checked;return} renderDish(); return } if(t.id==='rm'&&RE){ syncRecipe(); openRecipe(); return } if(d.dg!=null||d.dmeal!=null){ dictEdit(t); return } if(tab==='menu'&&menuChange(t))return; if(d.imeal!=null){V.items[+d.imeal].meal=t.value;return}
   if(t.id==='imp'&&t.files[0]){ t.files[0].text().then(x=>{ const j=JSON.parse(x); if(!j.days)throw 0; if(!confirm('Заменить текущие данные импортом?'))return; S=Object.assign(def(),j); save(); dirty(); render(); toast('Импортировано') }).catch(()=>toast('Неверный файл')) } });
 document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&e.target.id==='pq'){e.preventDefault();showRes()} });
 $('#ver').textContent='v'+VER; render();

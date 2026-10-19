@@ -41,6 +41,36 @@ function parse(text,o){ // o: {KP,COOK,index,MK,fdb(n),micro(n),meal}
   const ORD=['завтрак','перекус','обед','ужин'], meals=[];
   out.forEach(x=>{ const mm=ORD.includes(x.meal)?x.meal:'перекус'; let g=meals.find(z=>z.m===mm); if(!g)meals.push(g={m:mm,items:[]}); g.items.push(x) });
   meals.sort((a,b)=>ORD.indexOf(a.m)-ORD.indexOf(b.m)); return {meals,unknown:out.filter(x=>x.unk).map(x=>x.unk)} }
-const M={parse,portion,method};
+// ---- блюдо из диктовки в дневнике: «приготовил 100 г вырезки в соевом соусе, добавил 20 г мёда, обжарил» → ОДНА позиция ----
+const CVERB=/(^|[\s,.;])((?:при|с|за|об|по|от|на|под|до)?(?:готовил|жарил|жарила|пек|пёк|пекла|пекал|пекала|тушил|тушила|варил|варила|мариновал|мариновала|делал|делала|бавил|бавила|резал|резала|мешал|мешала|кинул|кинула|положил|положила|залил|залила)[аи]?|запёк|запек|испёк|испек|сготовил[аи]?|обжарка|запекание|тушение)(?=[\s,.;]|$)/gi;
+const COND=/^(сметан|сливк|соус|соевый|мед|мёд|кетчуп|майонез|горчиц|уксус|масло|специ|соль|перец черн|чеснок|имбир|паприк|сахар|лимонный сок|сок лимона|терияки|устричн)/;
+function isDish(text){ CVERB.lastIndex=0; const v=(String(text).toLowerCase().match(CVERB)||[]).map(x=>x.replace(/^[\s,.;]+/,'')); return v.filter(x=>!/^(с|при)?делал/.test(x)||TITLE.test(String(text).toLowerCase())).length?v:null }
+const TITLE=/(?:^|[\s,])(?:с|при)?(?:готовил|делал|варил|жарил|пек|пёк|тушил)\S*\s+((?:себе\s+)?(?:\S+\s+)?(?:суп|супчик|борщ|щи|солянк|омлет|яичниц|паст|салат|рагу|плов|жарк|котлет|блин|оладь|сырник|запеканк|кашу|каша|пиццу|пицца|лазань|гуляш|бульон|уху|окрошк|рис|гарнир|ужин|обед|завтрак)\S*)(?=\s+(?:из|с|со|на)\s|\s+\d|\s+(?:сто|двести|триста|пол|один|одна|два|две|три)\S*|\s*[,:]|\s*$)/i;
+function methOf(verbs,text){ const v=verbs.join(' '); if(/жар/.test(v))return 'fry'; if(/пек|пёк|запек/.test(v))return 'bake'; if(/туш/.test(v))return 'stew'; if(/вар/.test(v))return /суп|борщ|бульон/.test(text)?'soup':'boil';
+  if(/гриль/.test(text))return 'grill'; if(/на пару/.test(text))return 'steam'; return 'fry' }
+const GEN={индейки:'индейка',курицы:'курица',говядины:'говядина',свинины:'свинина',телятины:'телятина',баранины:'баранина',лосося:'лосось',семги:'сёмга',трески:'треска',утки:'утка',кролика:'кролик'};
+function short(n){ const w=n.toLowerCase().replace(/[(),«»].*$/,'').trim().split(/\s+/); if(w[0]==='фарш')return 'фарш'; if(/^(филе|грудка|бедро|бедра|окорок|голень|крылья|стейк)$/.test(w[0])&&w[1]&&GEN[w[1]])return GEN[w[1]];
+  if(w.length>1&&/(ая|ой|ый|ое|ий|ые|яя)$/.test(w[0]))return w[1]; return w[0] }
+function sauce(ings){ const n=ings.map(i=>i.n.toLowerCase()).join('|'), soy=/соев/.test(n), hon=/(^|\|)м[её]д/.test(n), ter=/терияки/.test(n);
+  return soy&&hon?' в соево-медовом соусе':ter?' в соусе терияки':soy?' в соевом соусе':hon?' с мёдом':/сметан/.test(n)?' в сметане':/сливк/.test(n)?' в сливках':'' }
+function dishName(ings){ const main=ings.filter(i=>i.on!==false&&!COND.test(i.n.toLowerCase())); const ws=[]; main.forEach(i=>{ const w=short(i.n); if(ws.length<2&&!ws.includes(w))ws.push(w) });
+  const nm=(ws.join(' и ')||'блюдо')+sauce(ings.filter(i=>i.on!==false)); return nm.charAt(0).toUpperCase()+nm.slice(1) }
+function dish(text,o){ const verbs=isDish(text); if(!verbs)return null; let t=' '+String(text).toLowerCase().replace(/ё/g,'е')+' ';
+  let title=null; const tm=t.match(TITLE); if(tm&&!/^(рис|гарнир)/.test(tm[1].replace(/^себе\s+/,''))){ title=tm[1].replace(/^себе\s+/,'').trim(); t=t.replace(tm[1],' , ') } if(tm&&/^(ужин|обед|завтрак)/.test(tm[1]))title=null;
+  t=t.replace(/(^|\s)из(?=\s)/g,' , '); t=t.replace(/(\S+)\s+(\d+(?:[.,]\d+)?\s*(?:г|гр|грамм\S*))\s+(?:в\s+)?сух\S*(?:\s+виде)?/g,'$2 $1 сухой').replace(/(\d+\s*(?:г|гр|грамм\S*)\s+)сух\S*\s+(\S+)/g,'$1$2 сухой');
+  t=t.replace(/(\s)(?:в|с|со|на)\s+((?:\S+(?:ом|ым|им|ой|ей|ем)\s+)?(?:соус|маринад|сметан|сливк|мед|медом|чеснок|масл|молок)\S*)/g,'$1, $2');
+  CVERB.lastIndex=0; t=t.replace(CVERB,'$1, ').replace(/(^|\s)(?:я|потом|затем|все|всё|вместе|это|и)(?=[\s,]|$)/g,'$1 ');
+  const sel=o.meal; const its=o.KP.parse(t,{index:o.index,meal:sel||o.meal}).filter(x=>x.text);
+  const ings=[], unk=[]; let meal=null;
+  its.forEach(x=>{ if(!x.food){ if(!/^(жарк|соус|маринад|блюд|ужин|обед)/.test(x.text))unk.push(x.text); return } meal=meal||x.meal; const f=rawOf(x.food,o.fdb); const est=x.num==null&&!x.unit;
+    const g=est?(COND.test(f.n.toLowerCase())?(/масло/.test(f.n)?10:/соус|соев/.test(f.n)?20:10):Math.min(f.po||100,200)):Math.round(x.g);
+    const prev=ings.find(i=>i.n===f.n); if(prev){ if(!est)prev.g=prev.est?g:prev.g+g; prev.est=prev.est&&est; return }
+    ings.push({n:f.n,g,k:f.k,p:f.p,f:f.f,c:f.c,cat:f.cat||'',m:o.micro?o.micro(f.n):undefined,on:true,est}) });
+  if(!ings.length||ings.length<2&&ings[0].est)return null;
+  let meth=methOf(verbs,t); if(title){ if(/^(суп|борщ|щи|солянк|бульон|уху|окрошк)/.test(title))meth='soup'; else if(/^салат/.test(title)&&!/жар|пек|туш|вар/.test(verbs.join(' ')))meth='raw' }
+  const nm=title?nomin(title):null; return {name:nm?nm.charAt(0).toUpperCase()+nm.slice(1):dishName(ings),auto:!nm,meth,meal:meal||o.meal,ings,unk} }
+function dishCalc(d,COOK,K){ const on=d.ings.filter(i=>i.on!==false&&i.g>0); if(!on.length)return {cooked:0,raw:0,k:0,p:0,f:0,c:0,m:[],oil:0,tot:{k:0,p:0,f:0,c:0}};
+  const r=COOK.recipe(on,d.meth,K), raw=on.reduce((a,i)=>a+i.g,0); r.raw=raw; r.tot={k:r.k*r.cooked/100,p:r.p*r.cooked/100,f:r.f*r.cooked/100,c:r.c*r.cooked/100}; return r }
+const M={parse,portion,method,dish,dishCalc,dishName,isDish,rawOf};
 if(typeof module!=='undefined'&&module.exports)module.exports=M; else G.DICT=M;
 })(typeof self!=='undefined'?self:this);

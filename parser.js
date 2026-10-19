@@ -143,7 +143,8 @@ function suggest(index,text,n){ const tg=w=>{w='  '+w+' ';const s=new Set();for(
   const q=tg(tokens(text).join(' ')); if(q.size<3)return []; const out=[];
   for(const it of index){ if(it.f.src==='offru')continue; let b=0; [it.f.n].concat(it.f.s||[]).forEach(nm=>{ const t=tg(String(nm).toLowerCase().replace(/ё/g,'е')); let c=0; q.forEach(x=>{if(t.has(x))c++}); const v=2*c/(q.size+t.size); if(v>b)b=v }); if(b>=.3)out.push([b,it.f]) }
   return out.sort((a,b)=>b[0]-a[0]).slice(0,n||3).map(x=>x[1]) }
-function resolve(index,ch,raw,meal){ let alts=search(index,ch.text,6); const cm=CUR_CHAIN?chainMatch(CUR_CHAIN,ch,index):null; if(cm)alts=[{food:cm.food,score:999,full:true,all:true,fz:0}].concat(cm.alts.map(f=>({food:f,score:1,fz:0}))); const best=alts[0]||null; const food=best&&best.food;
+function insane(f){ const C=G.COOK||(typeof require!=='undefined'?(()=>{try{return require('./cook.js')}catch(e){return null}})():null); const b=C&&f&&C.sane(f,f.cat,f.n); if(b&&typeof console!=='undefined')console.warn('[kbju] неправдоподобные БЖУ, пропускаю:',f.n,b); return b }
+function resolve(index,ch,raw,meal){ let alts=search(index,ch.text,6).filter(a=>!insane(a.food)); const cm=CUR_CHAIN?chainMatch(CUR_CHAIN,ch,index):null; if(cm)alts=[{food:cm.food,score:999,full:true,all:true,fz:0}].concat(cm.alts.map(f=>({food:f,score:1,fz:0}))); const best=alts[0]||null; const food=best&&best.food;
   let g=grams(food,ch.num,ch.unit,ch.size,ch.tsp), note='';
   const pcs=food&&food.pc&&(!ch.unit||/^pcs?$/.test(ch.unit[1]))&&!(ch.num>=20&&!ch.unit);
   if(food&&food.rf&&ch.whole&&!pcs){ const g0=g; g=Math.max(1,Math.round(g*(1-food.rf/100))); note=g0+' г целиком ≈ '+g+' г '+edibleWord(food) }
@@ -199,7 +200,7 @@ function parse(text,opt){ opt=opt||{}; const index=opt.index||makeIndex(opt.food
         if(r&&!/%$/.test(c[r.j]||'')&&hasF&&(hasQ||(r.j<c.length&&!unitOf(c[r.j]||'')?r.j<c.length:unitOf(c[r.j]||'')&&c.slice(r.j+1).some(x=>!WHOLE.test(x))))){ ch2.push(cur);cur=[];hasQ=false;hasF=false }
         if(r&&!/%$/.test(c[r.j]||'')){ for(let k=i;k<r.j;k++)cur.push(c[k]); i=r.j-1; hasQ=true; continue }
         if(unitOf(c[i])){cur.push(c[i]);hasQ=true;continue} if(!FILLER.has(c[i])&&!STOP.has(c[i])&&!SIZE[c[i]])hasF=true; cur.push(c[i]) } if(cur.length)ch2.push(cur) }
-    for(const c of ch2){ const raw=c.join(' ').replace(/диам(\d+)/g,'$1 см').replace(/тонкоетесто/g,'тонкое тесто').replace(/четыресыра/g,'четыре сыра'); const pc=parseChunk(index,c); if(!pc.text)continue;
+    for(const c of ch2){ const raw=c.join(' ').replace(/диам(\d+)/g,'$1 см').replace(/тонкоетесто/g,'тонкое тесто').replace(/четыресыра/g,'четыре сыра'); const pc=parseChunk(index,c); if(!pc.text){ const L=res[res.length-1]; if(L&&L.food&&L.num==null&&!L.unit&&pc.num!=null){ const nr=resolve(index,Object.assign({},pc,{text:L.text}),L.raw+' '+raw,L.meal); if(nr.food){ if(L.cands&&L.unsure&&nr.food.n!==L.food.n){nr.food=L.food;Object.assign(nr,nutr(L.food,nr.g))} nr.note=''; res[res.length-1]=nr } } continue }
       let r=resolve(index,pc,raw,seg.meal);
       // «гречка с котлетой» → две позиции, если целиком не нашлось
       if(!r.full&&!(r.all&&r.food&&/\s(с|со)\s/.test(' '+r.food.n+' '))&&/\s(с|со)\s/.test(' '+pc.text+' ')){ const parts=(' '+pc.text+' ').split(/\s(?:с|со)\s/).map(s=>s.trim()).filter(Boolean);
