@@ -1,5 +1,5 @@
 'use strict';
-const VER='1.12.0';
+const VER='1.13.0';
 const $=s=>document.querySelector(s), R=Math.round, esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const MEALS=['завтрак','обед','ужин','перекус'], MI={завтрак:'🍳',обед:'🍲',ужин:'🍽️',перекус:'🍎'};
 const KEY='kbju.v1';
@@ -298,7 +298,9 @@ function renderItems(){ const el=$('#vres'); if(!el)return; if(!V.items.length){
    ${!it.food?`<div class="cands"><span class="mu">${it.cands&&it.cands.length?'Похожее: ':'В базе нет. '}</span>${(it.cands||[]).map((c,j)=>`<button class="chip" data-cand="${i}:${j}">${esc(c.n)}</button>`).join('')}<button class="chip" data-pick="${i}">найти / добавить…</button></div>`:''}
    ${it.unsure&&it.cands&&it.cands.length>1?`<div class="cands"><span class="mu">Точно? </span>${it.cands.map((c,j)=>`<button class="chip${j===0?' on':''}" data-cand="${i}:${j}">${esc(c.n)}</button>`).join('')}<button class="chip" data-pick="${i}">другое…</button></div>`:''}</div>`).join('')+
    `<div class="card" style="margin-top:6px"><div class="kv"><span>Итого</span><span><b>${R(t.k)}</b> ккал · ${chips(t)}</span></div><div class="row" style="margin-top:8px"><button class="btn sp" data-vsave="1">${rm?'Готово':'✅ Записать в дневник'}</button></div></div>` }
-function doParse(text){ const mealSel=$('#vmeal')&&$('#vmeal').value; const r=KP.parse(text,{index:index(),meal:mealSel||V.meal||(cur===dk()?null:'обед')||KP.defaultMeal(),noMeals:V.mode==='recipe'||!!mealSel});
+let chainsP=null; function loadChains(){ return chainsP||(chainsP=new Promise((ok,no)=>{ const s=document.createElement('script'); s.src='chains.js'; s.onload=ok; s.onerror=()=>{chainsP=null;no()}; document.head.appendChild(s) })) }
+function doParse(text){ if(!self.CHAINS&&KP.chainIn(text)){ mst&&mst('Загружаю меню сети…'); loadChains().then(()=>doParse(text),()=>{ toast('Меню сетей не загрузилось — считаю по общей базе'); self.CHAINS=[]; doParse(text) }); return }
+  const mealSel=$('#vmeal')&&$('#vmeal').value; const r=KP.parse(text,{index:index(),meal:mealSel||V.meal||(cur===dk()?null:'обед')||KP.defaultMeal(),noMeals:V.mode==='recipe'||!!mealSel});
   r.forEach(x=>{ if(!x.meal)x.meal=mealSel||V.meal||KP.defaultMeal(); if(mealSel)x.meal=mealSel }); V.items=V.items.concat(r); renderItems();
   if(!r.length)toast('Не понял. Попробуй: «200 грамм гречки»') }
 function recalc(it){ if(it.food)Object.assign(it,KP.nutr(it.food,it.g)) }
@@ -347,7 +349,7 @@ const micBtn=(target,act)=>`<button class="micb" data-mict="${target}" data-mica
 const pl=(n,a,b,c)=>{n=Math.abs(n)%100;const m=n%10;return n>10&&n<20?c:m===1?a:m>1&&m<5?b:c};
 function saveVoice(){ const ok=V.items.filter(i=>i.food&&i.g>0), miss=V.items.filter(i=>!i.food); if(miss.length&&!confirm('Не нашлось: '+miss.map(i=>'«'+i.text+'»').join(', ')+'. Записать остальное без них?'))return; if(!ok.length){toast('Нечего сохранять — выбери продукт');return}
   if(V.mode==='recipe'){ RE.ings=RE.ings.concat(ok.map(i=>({n:i.food.n,g:R(i.g),k:i.food.k,p:i.food.p,f:i.food.f,c:i.food.c,m:i.food.m||microOf(i.food.n)||undefined}))); closeSheet(); openRecipe(); return }
-  const L=S.days[cur]=day(cur).slice(); ok.forEach(i=>{ L.push({id:uid(),meal:i.meal,name:i.food.n,g:R(i.g),k:i.k,p:i.p,f:i.f,c:i.c,k100:i.food.k,p100:i.food.p,f100:i.food.f,c100:i.food.c,cat:i.food.cat||'',src:i.food.src||'',m100:i.food.m||undefined,note:i.note||undefined}); S.used[i.food.n]=(S.used[i.food.n]||0)+1 });
+  const L=S.days[cur]=day(cur).slice(); ok.forEach(i=>{ L.push({id:uid(),meal:i.meal,name:i.food.n,g:R(i.g),k:i.k,p:i.p,f:i.f,c:i.c,k100:i.food.k,p100:i.food.p,f100:i.food.f,c100:i.food.c,cat:i.food.cat||'',src:i.food.src||'',m100:i.food.m||undefined,note:i.note||undefined,url:i.food.url||undefined,chain:i.food.chain||undefined}); S.used[i.food.n]=(S.used[i.food.n]||0)+1 });
   save(); dirty(); closeSheet(); render(); toast(`Записано: ${ok.length} · ${R(tot(ok).k)} ккал`) }
 // ---------- выбор продукта ----------
 let PK=null; // {cb, q}
@@ -417,6 +419,7 @@ function openSources(){ const n=self.FOODS.length, c=k=>self.FOODS.filter(f=>f.d
   • Open Food Facts (ODbL), экспорт с фильтром «страна: Россия» — скачано; ${c('off-ru')} популярных упакованных продуктов с проверкой КБЖУ (Атуотер ±15%).</p>
   <p><b>Приготовление</b><br>• USDA Table of Cooking Yields for Meat and Poultry (2014) — выход мяса/птицы при варке, жарке, тушении, запекании, гриле.<br>• USDA SR Legacy: пары «сухой/отварной» — уварка круп, бобовых, макарон.<br>• USDA Table of Nutrient Retention Factors, Release 6 (2007) — сохранность витаминов и минералов.<br>• Впитывание масла при жарке — по нормам Сборника рецептур / USDA FNDDS.</p>
   <p><b>Микронутриенты</b>: USDA ${ms('u')} · производные ${ms('d')} · по рецептуре ${ms('r')} · по составу ${ms('c')} · OFF ${ms('o')} · оценка ${ms('e')}. Нормы — МР 2.3.1.0253-21.</p>
+  <p><b>Сети</b> (меню с официальных сайтов, 19.10.2026; назови сеть во фразе: «пепперони додо 2 куска», «цезарь из шоколадницы»):<br>${KP.CHAIN_META.map(m=>'• '+esc(m[1])+' — '+m[3]+' блюд').join('<br>')}<br><span class="mu">Где сеть публикует противоречивые цифры — берётся типичное значение блюда; у Шоколадницы Б/Ж/У оценены (сайт даёт только ккал).</span></p>
   <p class="mu">Значения — справочные средние; конкретный продукт может отличаться. Для упакованных продуктов точнее этикетка или штрихкод.</p></div>`) }
 function edNote(o){ const f=fdb(o.name); if(o.note)return `<div class="mu" id="dnote" style="margin-top:4px">🍽 ${esc(o.note)}</div>`; if(!f||!f.rf)return '';
   const w=f.cat==='nut'?'ядра':/яйц/.test(f.n)?'без скорлупы':/fish|meat/.test(f.cat||'')?'без костей':'мякоти';
@@ -425,9 +428,9 @@ function openDetail(o){ DT=o; const isE=o.mode==='entry';
   sheet(`<div class="sh"><h2 style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(o.name)}</h2><button class="x" data-close${isE?'':'2'}="1">✕</button></div>
   <div class="row"><div style="width:96px"><input id="dg" type="number" inputmode="numeric" value="${R(o.g)}" aria-label="Граммы"></div><span class="mu">г</span>
    ${isE||o.mode==='add'?`<select id="dm" class="sp">${MEALS.map(m=>`<option ${o.meal===m?'selected':''}>${m}</option>`).join('')}</select>`:'<span class="sp"></span>'}</div>
-  ${edNote(o)}${srcLine(o.name)}<div id="dbody" style="margin-top:6px">${detailHtml(o.name,o.g,o.f100,o.m100)}</div>
+  ${edNote(o)}${o.url?`<div class="mu" style="margin-top:4px">🏪 ${esc(o.chain||'Сеть')}: данные с официального сайта · <a href="${esc(o.url)}" target="_blank" rel="noopener">источник</a></div>`:srcLine(o.name)}<div id="dbody" style="margin-top:6px">${detailHtml(o.name,o.g,o.f100,o.m100)}</div>
   <div class="row" style="margin-top:8px">${isE?`<button class="btn sp" data-esave="${o.id}">Сохранить</button><button class="btn s" data-ecopy="${o.id}">На сегодня</button><button class="btn r" data-edel="${o.id}">Удалить</button>`:o.mode==='add'?`<button class="btn sp" data-dadd="1">＋ В дневник</button>`:o.mode==='pick'?`<button class="btn sp" data-dpick="1">Выбрать</button>`:''}</div>`,isE?1:2) }
-function openEntry(e){ openDetail({mode:'entry',id:e.id,name:e.name,g:e.g,meal:e.meal,f100:{k:e.k100,p:e.p100,f:e.f100,c:e.c100},m100:e.m100,note:e.note}) }
+function openEntry(e){ openDetail({mode:'entry',id:e.id,name:e.name,g:e.g,meal:e.meal,f100:{k:e.k100,p:e.p100,f:e.f100,c:e.c100},m100:e.m100,note:e.note,url:e.url,chain:e.chain}) }
 function openEntryOld(e){ sheet(`<div class="sh"><h2>${esc(e.name)}</h2><button class="x" data-close="1">✕</button></div><div class="g2"><div><label>Граммы</label><input id="eg" type="number" inputmode="numeric" value="${R(e.g)}"></div><div><label>Приём пищи</label><select id="em">${MEALS.map(m=>`<option ${e.meal===m?'selected':''}>${m}</option>`).join('')}</select></div></div>
   <div class="mu" style="margin:6px 0">на 100 г: ${R(e.k100)} ккал · Б ${R(e.p100)} · Ж ${R(e.f100)} · У ${R(e.c100)}</div><div class="row"><button class="btn sp" data-esave="${e.id}">Сохранить</button><button class="btn s" data-ecopy="${e.id}">На сегодня</button><button class="btn r" data-edel="${e.id}">Удалить</button></div>`) }
 function addEntry(f,g,meal){ const n=KP.nutr(f,g); (S.days[cur]=day(cur).slice()).push({id:uid(),meal,name:f.n,g:R(g),k:n.k,p:n.p,f:n.f,c:n.c,k100:f.k,p100:f.p,f100:f.f,c100:f.c,cat:f.cat||'',src:f.src||'',m100:f.m||undefined}); S.used[f.n]=(S.used[f.n]||0)+1; save(); dirty() }
