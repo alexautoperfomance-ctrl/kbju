@@ -1,5 +1,5 @@
 'use strict';
-const VER='1.10.0';
+const VER='1.11.0';
 const $=s=>document.querySelector(s), R=Math.round, esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const MEALS=['завтрак','обед','ужин','перекус'], MI={завтрак:'🍳',обед:'🍲',ужин:'🍽️',перекус:'🍎'};
 const KEY='kbju.v1';
@@ -89,12 +89,28 @@ function render(){ $('#dlabel').textContent=tab==='diary'||(tab==='stats'&&statM
   $('#nav').innerHTML=[['diary','📒','Дневник'],['menu','🍽','Меню'],['stats','📊','Статистика'],['recipes','🍲','Рецепты'],['goals','🎯','Цели'],['more','⚙️','Ещё']].map(([k,i,n])=>`<button data-tab="${k}" class="${tab===k?'on':''}"><b>${i}</b>${n}</button>`).join('');
   $('#app').innerHTML=({diary:vDiary,menu:vMenu,stats:vStats,recipes:vRecipes,goals:vGoals,more:vMore})[tab](); if(tab==='diary')animMicro(); if(!render.keep)window.scrollTo(0,0); render.keep=false }
 function vDiary(){ const L=day(cur), t=tot(L), g=S.goals, w=S.water[cur]||0; const adv=advice(L,g,{water:w}); lastAdv.day=adv;
-  let h=`<div class="card">${summary(t,g)}</div>`+diaryMicro(L);
+  let h=`<div class="card">${summary(t,g)}</div>`+calHtml()+diaryMicro(L);
   h+=`<div class="card">`+MEALS.map(m=>{ const es=L.filter(e=>e.meal===m), mt=tot(es);
     return `<div class="meal"><div class="mh">${MI[m]} ${m[0].toUpperCase()+m.slice(1)} <span class="mu">${es.length?R(mt.k)+' ккал':''}</span><button class="add" data-addm="${m}">＋</button></div>`+
      es.map(e=>`<div class="it il" data-edit="${e.id}"><span class="n">${esc(e.name)}</span><span class="mu">${R(e.g)}г</span><span class="mac">${R(e.p)}·${R(e.f)}·${R(e.c)}</span><span class="k">${R(e.k)}</span></div>`).join('')+`</div>` }).join('')+`</div>`;
   if(S.set.water) h+=`<div class="card row wrow"><b>💧 ${w}<span class="mu"> / ${g.w} мл</span></b><div class="wt sp">${Array.from({length:Math.ceil(g.w/250)},(_,i)=>`<i class="${i<w/250?'f':''}"></i>`).join('')}</div><button class="btn s sm" data-water="-250">−</button><button class="btn sm" data-water="250">＋250</button></div>`;
   const th=tipsHtml(L,g); return h+advHtml(adv,'day',th,lastAdv.tips?lastAdv.tips.length:0) }
+// календарь: неделя (всегда) / месяц (по ▾); точка — статус дня по калориям
+let calM=null; const MON=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+const monOf=k=>pd(k.slice(0,7)+'-01'), wkStart=k=>addD(k,-((pd(k).getDay()+6)%7));
+function calSt(k){ const L=day(k); if(!L.length)return ''; const r=tot(L).k/(S.goals.k||1); return r<.85?'lo':r>1.1?'hi':'ok' }
+function calCell(k,m){ const t=dk(), st=calSt(k), kc=st?R(tot(day(k)).k):'';
+  return `<button class="cd${k===t?' td':''}${k===cur?' sel':''}${m!=null&&pd(k).getMonth()!==m?' oth':''}${k>t?' fut':''}" data-cal="${k}"><b>${pd(k).getDate()}</b><i class="${st}"></i>${S.set.cal&&kc?`<s>${kc}</s>`:''}</button>` }
+function calHtml(){ const open=!!S.set.cal, t=dk(); if(!calM||!open)calM=dk(monOf(cur)); let days=[], m=null;
+  if(open){ const f=monOf(calM); m=f.getMonth(); let k=wkStart(dk(f)); do{ for(let i=0;i<7;i++){days.push(k);k=addD(k,1)} }while(pd(k).getMonth()===m) }
+  else{ const s=wkStart(cur); for(let i=0;i<7;i++)days.push(addD(s,i)) }
+  const mf=monOf(calM), title=open?MON[mf.getMonth()]+' '+mf.getFullYear():MON[pd(cur).getMonth()]+' '+pd(cur).getFullYear();
+  return `<div class="card cal"><div class="row ch"><button class="cn" data-calm="-1">‹</button><span class="sp ct">${title}</span>${cur!==t?'<button class="ctd" data-caltoday="1">Сегодня</button>':''}<button class="cn" data-calm="1">›</button><button class="cn" data-caltog="1">${open?'▴':'▾'}</button></div>
+  <div class="cg">${WD.map(w=>`<span class="wd">${w}</span>`).join('')}${days.map(k=>calCell(k,m)).join('')}</div>${open?'<div class="mu cl"><i class="lo"></i>мало <i class="ok"></i>норма <i class="hi"></i>перебор</div>':''}</div>` }
+function calClick(d){ if(d.cal){cur=d.cal;render.keep=true;render();return true}
+  if(d.caltoday){cur=dk();calM=null;render.keep=true;render();return true}
+  if(d.caltog){S.set.cal=!S.set.cal;save();calM=null;render.keep=true;render();return true}
+  if(d.calm){ if(S.set.cal){const f=monOf(calM);f.setMonth(f.getMonth()+ +d.calm);calM=dk(f)} else cur=addD(cur,7*d.calm); render.keep=true;render();return true } return false }
 const SHORT={A:'Вит. A',D:'Вит. D',E:'Вит. E',K:'Вит. K',C:'Вит. C',B1:'B1',B2:'B2',B3:'B3 (PP)',B5:'B5',B6:'B6',B7:'B7 биотин',B9:'B9 фолаты',B12:'B12',Ch:'Холин',Ca:'Кальций',P:'Фосфор',Mg:'Магний',K_:'Калий',Na:'Натрий',Fe:'Железо',Zn:'Цинк',Cu:'Медь',Mn:'Марганец',Se:'Селен',I:'Йод',Cr:'Хром',Fib:'Клетчатка',O3:'Омега-3',Sug:'Сахара',Chol:'Холестерин'};
 let microPrev={};
 function diaryMicro(L){ const a=MICROS.analyze([L],S.prof,MK,microLookup); lastAdv.micro=a; const low=a.list.filter(d=>d.st==='low').length, over=a.list.filter(d=>d.st==='over').length, ok=a.list.length-low-over;
@@ -419,6 +435,7 @@ document.addEventListener('click',e=>{ const mr=e.target.closest('[data-mic]'); 
   const t=e.target.closest('button,[data-edit],[data-pf],.sheet'); if(!t)return; const d=t.dataset;
   if(t.classList.contains('sheet')){ if(e.target===t)closeSheet(t.id==='sheet2'?2:1); return }
   if(dictClick(d,t))return; if(tab==='menu'&&menuClick(d,t))return;
+  if(tab==='diary'&&calClick(d))return;
   if(d.tab){tab=d.tab;render();return} if(d.sm){statMode=d.sm;render();return}
   if(t.id==='prev'||t.id==='next'){cur=addD(cur,t.id==='prev'?-1:1);render();return}
   if(t.id==='fab'){openVoice();return} if(d.addm){openVoice(d.addm);return}
