@@ -1,6 +1,6 @@
 # Сборка встроенной базы: значения на 100 г (Скурихин/таблицы хим. состава + USDA FDC, вручную), плюс
 # производные варианты (способы приготовления по коэффициентам потерь воды/жира, жирность молочки).
-import json,re,sys
+import json,re,sys,collections
 sys.path.insert(0,'tools'); import cook
 DCOOK={}
 DER={}
@@ -12,7 +12,9 @@ def add(name,syn,k,p,f,c,pc=None,por=None,cat='',src='base',base=None):
     if src=='derived' and base: DER[name.replace('ё','е').strip()]=base
     if name in items: return
     if k is None: k=round(4*p+9*f+4*c)
+    _pl=items[base].get('pl') if src=='derived' and base and base in items else None
     items[name]=dict(n=name,s=[x.replace('ё','е').strip() for x in syn if x.strip()],k=round(k),p=round(p,1),f=round(f,1),c=round(c,1),pc=pc,po=por,cat=cat,src=src); order.append(name)
+    if _pl: items[name]['pl']=_pl
 ADJ={'m':['отварной','жареный','тушеный','запеченный'],'f':['отварная','жареная','тушеная','запеченная'],
      'n':['отварное','жареное','тушеное','запеченное'],'p':['отварные','жареные','тушеные','запеченные']}
 VAR={'m':'вареный','f':'вареная','n':'вареное','p':'вареные'}
@@ -173,6 +175,28 @@ GEN={'свинина':(201,27.5,9.2,'f','USDA SR 167855 pork composite (leg, loi
  'курица':(219,24.7,12.6,'f','USDA SR 171051 chicken meat+skin, stewed',['куриная грудка отварная','курица жареная'])}
 for n in [x for x in items if x.startswith('трайфл')]: items[n]['po']=150; items[n]['pc']=150  # кафе/магазин: стаканчик ~150 г
 # пицца: вес целой по диаметру (pz {см: г}); Den's Pizza — с сайта dens-pizza.ru (2026-10-19), прочие — 520 г на 30 см (Den's «Пепперони»), масштаб по площади в parser.js
+# ---------- v1.17.0: обобщённые блюда — медианы сетей/магазинов (tools/build_dishes.py → tools/dishes_chain.json) ----------
+# В базу — только блюда, где ≥2 независимых заведения согласны (±25% ккал); если блюдо уже есть по Скурихину/СР —
+# сверяем (±25%): совпало — оставляем справочное значение и берём реалистичную порцию сетей, не совпало — справочное, сети игнорируем.
+def por_ok(n,po,pos):
+    soup=re.search(r'суп|борщ|щи|солянк|уха|рассольник|харчо|окрошк|бульон|рамен|фо бо|том ям|лагман',n)
+    hi=550 if soup else 450; lo=150 if soup else 25
+    if po and pos=='chain' and lo<=po<=hi: return po
+    if po and pos=='store' and lo<=po<=min(hi,350): return po
+    return 300 if soup else 80 if re.search(r'пирожок|пирожк|слойк|круассан|пончик|эклер|маффин|кекс|сырок|беляш|самса|ватрушк',n) else 100 if re.search(r'торт|пирожн|чизкейк|тирамису|медовик|наполеон|брауни|десерт|трайфл|пудинг|панна',n) else 200
+CHK=collections.Counter(); ALI={}
+for it in items.values():
+    for a in it['s']: ALI.setdefault(a,it)
+for x in json.load(open('tools/dishes_chain.json',encoding='utf8')):
+    n=x['n']; po=por_ok(n,x['po'],x['pos']); old=items.get(n) or ALI.get(n)
+    if old:
+        if old['k'] and abs(x['k']-old['k'])/old['k']<=0.25:
+            CHK['ref+chain']+=1; old['rs2']='сети: медиана %d заведений'%x['v']
+            if not old.get('po'): old['po']=po  # проверенные порции (аудит v1.11.3) не трогаем
+        else: CHK['ref wins']+=1
+        continue
+    add(n,[],x['k'],x['p'],x['f'],x['c'],None,po,'dish','base'); items[n]['ds']='chains'; items[n]['rs']='медиана %d заведений'%x['v']; CHK['new']+=1
+print('блюда из сетей:',dict(CHK))
 PZ={}  # бренды пиццерий — в chains.js (tools/build_chains.py)
 for n,z in PZ.items():
     if n in items: items[n]['pz']=z; items[n]['rs']='dens-pizza.ru'

@@ -1,5 +1,5 @@
 'use strict';
-const VER='1.16.2';
+const VER='1.17.0';
 const $=s=>document.querySelector(s), R=Math.round, esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const MEALS=['завтрак','обед','ужин','перекус'], MI={завтрак:'🍳',обед:'🍲',ужин:'🍽️',перекус:'🍎'};
 const KEY='kbju.v1';
@@ -299,7 +299,7 @@ function renderVoice(){ const rm=V.mode==='recipe', ex=rm?'«500 грамм ри
 function renderItems(){ const el=$('#vres'); if(!el)return; if(!V.items.length){el.innerHTML='';return} const rm=V.mode==='recipe';
   const t=tot(V.items.filter(i=>i.food));
   el.innerHTML=V.items.map((it,i)=>`<div class="pi"><div class="top"><button class="nm ${it.food?'':'bad'}" data-pick="${i}">${it.food?esc(it.food.n):'❓ «'+esc(it.text)+'» — не нашлось'} <span class="mu">▾</span></button><b>${it.food?R(it.k)+' ккал':''}</b></div>
-   <div class="ctl">${rm?'<span></span>':`<select data-imeal="${i}">${MEALS.map(m=>`<option ${it.meal===m?'selected':''}>${m}</option>`).join('')}</select>`}<div class="row"><input type="number" inputmode="numeric" data-ig="${i}" value="${R(it.g)}"><span class="mu">г</span></div><button class="x" data-idel="${i}">✕</button></div>
+   <div class="ctl">${rm?'<span></span>':`<select data-imeal="${i}">${MEALS.map(m=>`<option ${it.meal===m?'selected':''}>${m}</option>`).join('')}</select>`}<div class="row">${it.por&&it.food?'<span class="mu">порция</span>':''}<input type="number" inputmode="numeric" data-ig="${i}" value="${R(it.g)}"><span class="mu">г</span></div><button class="x" data-idel="${i}">✕</button></div>
    ${it.food?`<div class="mu" style="margin-top:4px">${chips(it)} <span>«${esc(it.raw)}»</span></div>`:''}${it.note?`<div class="mu inote">🍽 ${esc(it.note)}</div>`:''}
    ${!it.food?`<div class="cands"><span class="mu">${it.cands&&it.cands.length?'Похожее: ':'В базе нет. '}</span>${(it.cands||[]).map((c,j)=>`<button class="chip" data-cand="${i}:${j}">${esc(c.n)}</button>`).join('')}<button class="chip" data-pick="${i}">найти / добавить…</button></div>`:''}
    ${it.unsure&&it.cands&&it.cands.length>1?`<div class="cands"><span class="mu">Точно? </span>${it.cands.map((c,j)=>`<button class="chip${j===0?' on':''}" data-cand="${i}:${j}">${esc(c.n)}</button>`).join('')}<button class="chip" data-pick="${i}">другое…</button></div>`:''}</div>`).join('')+

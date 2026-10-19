@@ -59,14 +59,14 @@ function sim(a,b){ if(a===b)return 1; a=a.replace(/й/g,'и'); b=b.replace(/й/g
   const d=Math.min(lev(a,b,2),a.length<b.length?lev(a,b.slice(0,a.length),1)+.5:9);
   if(d<=1&&L>=5)return .8-(d>=1?(d-1)*.4:0); if(d<=1.5&&m>=5)return .7; if(d<=2&&m>=7&&k>=2)return .6; return 0 }
 function same(a,b){ return sim(a,b)>=.88 }
-function scoreName(q,n){ let mq=0,fz=0,used=new Set(); q.forEach((t,qi)=>{ let bi=-1,bs=0; n.forEach((x,ii)=>{ if(used.has(ii))return; let v=sim(t,x); if(v<.9&&q.raw&&n.raw){ const w=sim(q.raw[qi],n.raw[ii]); if(w>v)v=Math.min(w,.8) } if(v>bs){bs=v;bi=ii} });
+function scoreName(q,n){ let mq=0,fz=0,used=new Set(); q.forEach((t,qi)=>{ let bi=-1,bs=0; n.forEach((x,ii)=>{ if(used.has(ii))return; let v=sim(t,x); if(v<.9&&q.raw&&n.raw){ const w=sim(q.raw[qi],n.raw[ii]); if(w>v)v=Math.min(w,.8) } if(v>.6&&q.raw&&n.raw&&q.raw[qi].length<=4&&n.raw[ii]&&n.raw[ii].length-q.raw[qi].length>=2&&n.raw[ii].startsWith(q.raw[qi]))v=.6; if(v>bs){bs=v;bi=ii} });
    if(bi>=0){mq+=bs;used.add(bi);if(bs<.9)fz++; if(q.raw&&n.raw&&q.raw[qi]&&q.raw[qi].length>=4&&n.raw[bi]){ const e=w=>w.replace(/(ой|ом|а|я|ы|и|у|ю|е)$/,''); if(q.raw[qi]===n.raw[bi]||e(q.raw[qi])===e(n.raw[bi]))mq+=.1 }} });
   if(!mq)return {s:-1,fz:0}; const extra=n.length-used.size; return {s:mq*10-extra*3.2-(q.length-used.size)*6+(sim(q[0],n[0])>=.9?1.5:0),fz,all:used.size===q.length} }
 function search(index,text,lim){ const qw=tokens(String(text).replace(/без\s+\S+/g,' ')).filter(t=>!STOP.has(t)&&!FILLER.has(t)&&!SIZE[t]&&!(t in ONES)), q=qw.map(stem); q.raw=qw; if(!q.length)return [];
   const out=[]; for(const it of index){ let b=-1e9,fz=0,al=false; it.ns.forEach((n,ni)=>{const r=scoreName(q,n),s=r.s+(ni===0?.3:0); if(s>b){b=s;fz=r.fz;al=r.all}})
    if(b>0&&it.f.src==='offru'&&fz)continue;
    if(b>0){ if(it.r)b+=1; if(it.f.src==='derived')b-=.6; if(it.f.src==='off'||it.f.src==='offru')b-=.3; if(it.f.used)b+=Math.min(1.5,it.f.used*.3); out.push({it,b,fz,al}) } }
-  out.sort((a,b)=>b.b-a.b); return out.slice(0,lim||8).map(x=>({food:x.it.f,recipe:x.it.r,score:x.b,fz:x.fz,all:x.al,full:!x.fz&&x.b>=q.length*10-1})) }
+  const qs=String(text).toLowerCase().replace(/ё/g,'е').replace(/\s+/g,' ').trim(), ex=x=>x.it.f&&x.it.f.n===qs?1:0; out.sort((a,b)=>b.b-a.b||ex(b)-ex(a)); return out.slice(0,lim||8).map(x=>({food:x.it.f,recipe:x.it.r,score:x.b,fz:x.fz,all:x.al,full:!x.fz&&x.b>=q.length*10-1})) }
 // ---------- разбор ----------
 function defaultMeal(d){ const h=(d||new Date()).getHours(); return h>=4&&h<11?'завтрак':h<16&&h>=11?'обед':h>=16&&h<18?'перекус':h>=18&&h<23?'ужин':'перекус' }
 function grams(food,num,unit,size,tsp){ const pc=food&&food.pc, po=food&&food.po; let n=num==null?null:num, g;
@@ -188,7 +188,7 @@ function resolve(index,ch,raw,meal){ let alts=search(index,ch.text,6).filter(a=>
   const unsure=!!(best&&(best.fz>0||best.score<q*10*.55||(alts[1]&&!best.full&&alts[1].score>best.score-1&&alts[1].food.k!==food.k)));
   // обобщённое мясо («свинина») без уточнения: по умолчанию готовый средний отруб, но предлагаем уточнить отруб
   let amb=null; if(food&&food.amb&&food.amb.length&&best.full){ amb=[food].concat(food.amb.map(n=>{const a=search(index,n,1)[0];return a&&a.food.n===n?a.food:null}).filter(Boolean)) }
-  const cands=amb?amb.slice(0,3):[]; if(!amb)alts.forEach(a=>{ if(cands.length<3&&!cands.some(c=>c.n===a.food.n||(c.k===a.food.k&&c.p===a.food.p&&c.f===a.food.f)))cands.push(a.food) }); const r={meal,text:ch.text,raw,g,num:ch.num,unit:ch.unit&&ch.unit[1],food,recipe:!!(best&&best.recipe),alts:alts.map(a=>a.food),full:!!(best&&best.full),all:!!(best&&best.all),unsure:unsure||!!(amb&&amb.length>1),cands,note};
+  const cands=amb?amb.slice(0,3):[]; if(!amb)alts.forEach(a=>{ if(cands.length<3&&!cands.some(c=>c.n===a.food.n||(c.k===a.food.k&&c.p===a.food.p&&c.f===a.food.f)))cands.push(a.food) }); const r={meal,text:ch.text,raw,g,num:ch.num,unit:ch.unit&&ch.unit[1],food,recipe:!!(best&&best.recipe),alts:alts.map(a=>a.food),full:!!(best&&best.full),all:!!(best&&best.all),unsure:unsure||!!(amb&&amb.length>1),cands,note,por:!!(food&&ch.num==null&&(!ch.unit||ch.unit[1]==='po'||(ch.unit[1]==='g'&&ch.unit[2]>=50)))};
   if(!food){ r.cands=suggest(index,ch.text,3); r.miss=true }
   if(food&&food.cnote)r.note=food.cnote+(r.note?' · '+r.note:'');
   if(cm){ r.unsure=false; r.cands=[food].concat(cm.alts).slice(0,3) }
