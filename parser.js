@@ -15,7 +15,7 @@ const UNITS=[[/^(г|гр|грамм\S*|граммов)$/,'g',1],[/^(кг|кил�
  [/^(кус|кусок|куска|куски|кусков|кусочек|кусочка|кусочков|кусочки)$/,'pcs'],[/^(ломтик\S*|ломт\S*|слайс\S*)$/,'slice'],
  [/^(банк\S*|банок|баночк\S*)$/,'can'],[/^(бутылк\S*|бутылок|бутылочк\S*)$/,'g',500],[/^(пачк\S*|пачек|упаковк\S*|упаковок|пакет\S*)$/,'pack'],
  [/^(горст\S*)$/,'g',30],[/^(щепот\S*)$/,'g',1],[/^(зубчик\S*|зубчиков)$/,'g',5],[/^половник\S*$/,'g',100],[/^плитк\S*$/,'g',100],
- [/^(бокал\S*|фужер\S*)$/,'g',150],[/^(рюмк\S*|рюмок|стопк\S*|стопок)$/,'g',50],[/^шот\S*$/,'g',40],[/^(ковш\S*)$/,'g',250],[/^(батон\S*)$/,'g',400],[/^(буханк\S*)$/,'g',600]];
+ [/^(бокал\S*|фужер\S*)$/,'g',150],[/^(рюмк\S*|рюмок|стопк\S*|стопок)$/,'g',50],[/^шот\S*$/,'g',40],[/^(ковш\S*)$/,'g',250],[/^(батон|батона|батоны|батонов|батоном)$/,'g',400],[/^(буханк\S*)$/,'g',600]];
 const SIZE={большой:1.4,большая:1.4,большое:1.4,большую:1.4,большие:1.4,больших:1.4,огромный:1.7,огромная:1.7,огромную:1.7,маленький:.7,маленькая:.7,маленькое:.7,маленькую:.7,маленьких:.7,небольшой:.75,небольшая:.75,небольшую:.75,средний:1,средняя:1,среднюю:1,полный:1,полную:1};
 const FILLER=new Set('я мы съел съела съели поел поела поели скушал скушала покушал покушала ел ела пил пила выпил выпила выпили сегодня был была были было потом затем еще также а ну вот так типа примерно около где-то где то еще и ещё плюс кроме того сначала после это у меня мне взял взяла заказал заказала приготовил приготовила сделал сделала перекусил'.split(' '));
 const STOP=new Set('и с со в во на по из для к ко от до за под при о об а же'.split(' '));
@@ -31,7 +31,7 @@ function stem(w){ if(IRR[w])return IRR[w]; if(/\d/.test(w)||w.length<=3)return w
   for(const e of ENDS) if(w.endsWith(e)&&w.length-e.length>=3){w=w.slice(0,-e.length);break}
   w=w.replace(/(е|о)чк$/,'к'); return IRR[w]||w }
 function norm(s){ return (' '+String(s).toLowerCase().replace(/ё/g,'е')+' ')
-  .replace(/макаронс\S*/g,'макаруны').replace(/(трайфл\S*|трифл\S*)\s+в\s+стаканчик\S*/g,'$1').replace(/(\d)[,.](\d)/g,'$1.$2').replace(/(\d)\s*(процент\S*|%)/g,'$1% ')
+  .replace(/(?:диаметр\S*\s+|круг\S*\s+)?(\d{2})\s*(?:см|сантиметр\S*)(?=[\s.,;]|$)/g,' диам$1 ').replace(/(?:на\s+)?тонк\S*\s+тест\S*/g,' тонкоетесто ').replace(/(?:на\s+)?(?:традиционн\S*|пышн\S*|толст\S*)\s+тест\S*/g,' ').replace(/(\s)круг(?=\s)/g,'$1').replace(/макаронс\S*/g,'макаруны').replace(/(^|\s)(?:4|четыр\S*)\s+сыр\S*/g,(m,a,o,str)=>/пицц/.test(str)?a+'четыресыра':m).replace(/(трайфл\S*|трифл\S*)\s+в\s+стаканчик\S*/g,'$1').replace(/(\d)[,.](\d)/g,'$1.$2').replace(/(\d)\s*(процент\S*|%)/g,'$1% ')
   .replace(/(\d)(г|гр|кг|мл|л|шт)(?=[\s.,;]|$)/g,'$1 $2')
   .replace(/(\s)пол(?=(бутылк|упаковк|стакан|тарелк|порци|литр|кило|банк|ложк|кружк|чашк|пачк|плитк|батон|буханк|кусочк|кусок|куска|банан|яблок|апельсин|авокадо|огурц|помидор|грейпфрут|лимон|пицц|лепешк|лаваш|булк|багет|шаурм|шаверм|пачк))/g,'$1пол ')
   .replace(/[«»"!?()]/g,' ').replace(/ - /g,' ').replace(/\s+/g,' ') }
@@ -60,7 +60,7 @@ function sim(a,b){ if(a===b)return 1; a=a.replace(/й/g,'и'); b=b.replace(/й/g
   if(d<=1&&L>=5)return .8-(d>=1?(d-1)*.4:0); if(d<=1.5&&m>=5)return .7; if(d<=2&&m>=7&&k>=2)return .6; return 0 }
 function same(a,b){ return sim(a,b)>=.88 }
 function scoreName(q,n){ let mq=0,fz=0,used=new Set(); q.forEach((t,qi)=>{ let bi=-1,bs=0; n.forEach((x,ii)=>{ if(used.has(ii))return; let v=sim(t,x); if(v<.9&&q.raw&&n.raw){ const w=sim(q.raw[qi],n.raw[ii]); if(w>v)v=Math.min(w,.8) } if(v>bs){bs=v;bi=ii} });
-   if(bi>=0){mq+=bs;used.add(bi);if(bs<.9)fz++} });
+   if(bi>=0){mq+=bs;used.add(bi);if(bs<.9)fz++; if(q.raw&&n.raw&&q.raw[qi]&&q.raw[qi].length>=4&&n.raw[bi]){ const e=w=>w.replace(/(ой|ом|а|я|ы|и|у|ю|е)$/,''); if(q.raw[qi]===n.raw[bi]||e(q.raw[qi])===e(n.raw[bi]))mq+=.1 }} });
   if(!mq)return {s:-1,fz:0}; const extra=n.length-used.size; return {s:mq*10-extra*3.2-(q.length-used.size)*6+(sim(q[0],n[0])>=.9?1.5:0),fz,all:used.size===q.length} }
 function search(index,text,lim){ const qw=tokens(String(text).replace(/без\s+\S+/g,' ')).filter(t=>!STOP.has(t)&&!FILLER.has(t)&&!SIZE[t]&&!(t in ONES)), q=qw.map(stem); q.raw=qw; if(!q.length)return [];
   const out=[]; for(const it of index){ let b=-1e9,fz=0,al=false; it.ns.forEach((n,ni)=>{const r=scoreName(q,n),s=r.s+(ni===0?.3:0); if(s>b){b=s;fz=r.fz;al=r.all}})
@@ -70,12 +70,13 @@ function search(index,text,lim){ const qw=tokens(String(text).replace(/без\s+
 // ---------- разбор ----------
 function defaultMeal(d){ const h=(d||new Date()).getHours(); return h>=4&&h<11?'завтрак':h<16&&h>=11?'обед':h>=16&&h<18?'перекус':h>=18&&h<23?'ужин':'перекус' }
 function grams(food,num,unit,size,tsp){ const pc=food&&food.pc, po=food&&food.po; let n=num==null?null:num, g;
+  if(!unit&&n!=null&&n<=2&&n%1!==0&&food&&(/drink/.test(food.cat||'')||/пив|кол|лимонад|сок|вод|квас|энергетик|сидр/.test(food.n))) return Math.round(n*1000); // «пиво 0,5» = 0,5 л
   if(!unit){ if(n==null) g=pc&&pc<=300&&!food.pl?pc:(po||pc||100); else if(n>=20) g=n; else g=n*(pc||po||100) }
   else if(unit[1]==='g') g=(n==null?1:n)*unit[2];
   else if(unit[1]==='pc'||unit[1]==='pcs') g=(n==null?1:n)*(pc||(unit[1]==='pcs'?Math.min(po||80,120):po)||100);
   else if(unit[1]==='slice') g=(n==null?1:n)*(pc&&pc<=40?pc:20);
   else if(unit[1]==='po') g=(n==null?1:n)*(po||pc||250);
-  else if(unit[1]==='spoon') g=(n==null?1:n)*(tsp?5:15)*(food&&/мед|сметан|майонез|варень|джем|арахисов|нутелл|паст/.test(food.n)?1.4:food&&/сахар|сол|мук|какао/.test(food.n)?.8:1);
+  else if(unit[1]==='spoon') g=(n==null?1:n)*(tsp?5:15)*(food&&/мед|сметан|варень|джем|арахисов|нутелл|паст/.test(food.n)?1.4:food&&/^(сахар|соль|мук)|какао/.test(food.n)?.8:1);
   else if(unit[1]==='can') g=(n==null?1:n)*(food&&/drink|напит/.test(food.cat||'')||food&&/пив|кол|лимонад|энергетик|сок/.test(food.n)?330:food&&/кукуруз|горош|фасол/.test(food.n)?340:185);
   else if(unit[1]==='pack') g=(n==null?1:n)*(pc&&pc>=40?pc:food&&/чипс|сухарик|кириешк/.test(food.n)?100:200);
   return Math.max(1,Math.round(g*(size||1))) }
@@ -92,10 +93,12 @@ function splitItems(ts){ const out=[]; let cur=[];
   const SEP=/^(и|плюс|да|потом|затем|еще|ещё|также|а|ну|после|сверху|вприкуску|заел|заела|запил|запила)$/;
   for(const t of ts){ if(t===','||t===';'||SEP.test(t)){ if(cur.length)out.push(cur); cur=[]; continue } cur.push(t) }
   if(cur.length)out.push(cur); return out }
-const WHOLE=/^(кожур|кожиц|шкурк|скорлуп|целиком|целый|целая|целое|целые|неочищ|нечищ)/;
+const WHOLE=/^(кожур|кожиц|шкурк|скорлуп|целиком|целый|целая|целое|целые|целую|целой|неочищ|нечищ)/;
 function parseChunk(index,ts){ // одна позиция: количество + продукт
   ts=ts.filter(t=>!FILLER.has(t)); let whole=false; ts=ts.filter((t,i)=>{ if(WHOLE.test(t)){whole=true;return false} if(/^(с|со|в)$/.test(t)&&WHOLE.test(ts[i+1]||''))return false; return true }); let num=null,unit=null,size=1,tsp=false,food=[];
+  let diam=null,thin=false;
   for(let i=0;i<ts.length;i++){ const t=ts[i];
+    { const dm=/^диам(\d+)$/.exec(t); if(dm){diam=+dm[1];continue} if(t==='тонкоетесто'){thin=true;continue} }
     if(SIZE[t]){size*=SIZE[t];continue}
     if(SPOON_TSP.test(t)&&unitOf(ts[i+1]||'')&&unitOf(ts[i+1])[1]==='spoon'){tsp=true;continue}
     if(SPOON_TBSP.test(t)&&unitOf(ts[i+1]||'')){continue}
@@ -103,8 +106,12 @@ function parseChunk(index,ts){ // одна позиция: количество 
     const u=unit?null:unitOf(t); if(u&&(num!==null||food.length===0||i<ts.length-1||true)){ if(!(u[1]==='g'&&u[2]===1000&&t==='л'&&num===null&&food.length)) {unit=u; if(/^чайн/.test(ts[i-1]||''))tsp=true; continue} }
     food.push(t) }
   if(num==null&&unit&&unit[1]==='g'&&/^(грамм|гр|г)/.test('')){}
-  const text=food.join(' ').trim(); return {num,unit,size,tsp,text,whole} }
+  const text=food.join(' ').trim(); return {num,unit,size,tsp,text,whole,diam,thin} }
 function edibleWord(f){ return f&&f.cat==='nut'?'ядра':f&&/яйц/.test(f.n)?'без скорлупы':f&&/fish|meat/.test(f.cat||'')?'без костей':'мякоти' }
+// пицца: вес целой по диаметру (pz у брендов, иначе 520 г на 30 см — Den's Pizza «Пепперони» — по площади), кусков: <20 см — 4, <25 — 6, иначе 8; тонкое тесто ×0.75
+function pizza(food,d,thin){ d=d||30; const z=food.pz; let W;
+  if(z&&z[d])W=z[d]; else if(z){ const ks=Object.keys(z).map(Number).sort((a,b)=>Math.abs(a-d)-Math.abs(b-d)); W=z[ks[0]]*(d/ks[0])**2 } else W=520*(d/30)**2;
+  if(thin)W*=.75; W=Math.round(W/5)*5; const n=d<20?4:d<25?6:8; return {d,thin:!!thin,W,n,sl:Math.round(W/n)} }
 // не нашлось: ближайшие по буквам (триграммы), чтобы предложить, а не подставлять молча
 function suggest(index,text,n){ const tg=w=>{w='  '+w+' ';const s=new Set();for(let i=0;i<w.length-2;i++)s.add(w.slice(i,i+3));return s};
   const q=tg(tokens(text).join(' ')); if(q.size<3)return []; const out=[];
@@ -115,6 +122,14 @@ function resolve(index,ch,raw,meal){ const alts=search(index,ch.text,6); const b
   const pcs=food&&food.pc&&(!ch.unit||/^pcs?$/.test(ch.unit[1]))&&!(ch.num>=20&&!ch.unit);
   if(food&&food.rf&&ch.whole&&!pcs){ const g0=g; g=Math.max(1,Math.round(g*(1-food.rf/100))); note=g0+' г целиком ≈ '+g+' г '+edibleWord(food) }
   else if(food&&food.rf&&pcs){ const n=Math.round((ch.num==null?1:ch.num)*10)/10; note=n+' шт ≈ '+g+' г '+edibleWord(food) }
+  if(food&&/^пицц/.test(food.n)&&!(ch.unit&&ch.unit[1]==='g')&&!(ch.num>=20&&!ch.unit)){ const pz=pizza(food,ch.diam,ch.thin), u=ch.unit&&ch.unit[1];
+    const n=ch.num==null?null:ch.num, word=(k)=>{const a=Math.abs(k)%100,b=a%10;return a>10&&a<20?'кусков':b===1?'кусок':b>=2&&b<=4?'куска':'кусков'};
+    const tag='пицца '+pz.d+' см'+(pz.thin?', тонкое тесто':'')+': целая '+pz.W+' г = '+pz.n+' '+word(pz.n)+(ch.diam?'':' (размер не назван — считаю 30 см)');
+    if(u==='pcs'||u==='slice'){ const k=n==null?1:n; g=Math.round(k*pz.sl); note=k+' '+word(k)+' × '+pz.sl+' г = '+g+' г · '+tag }
+    else if(ch.whole||u==='pc'||(n!=null&&!u)){ const k=ch.whole&&n==null?1:(n==null?1:n); g=Math.round(k*pz.W); note=(k===.5?'половина':k===1?'целая':k+' шт')+' = '+g+' г · '+tag }
+    else if(!u){ g=2*pz.sl; note='2 куска × '+pz.sl+' г = '+g+' г (количество не названо) · '+tag } }
+  // «сырник», «блин», «ролл» (ед. ч.) у блюд, записанных во мн. ч. — одна штука, а не порция
+  if(food&&food.pl&&food.pc&&ch.num==null&&!ch.unit&&!/^(пицц|ролл)/.test(food.n)){ const qw=ch.text.split(/\s+/).filter(Boolean), nw=food.n.split(/\s+/); const sing=qw.some(w=>nw.some(x=>/(ы|и)$/.test(x)&&x!==w&&x.slice(0,4)===w.slice(0,4)&&!/(ы|и|ов|ей)$/.test(w))); if(sing){ g=Math.round(food.pc*(ch.size||1)); note='1 шт ≈ '+g+' г' } }
   const q=ch.text.split(/\s+/).filter(Boolean).length||1;
   const unsure=!!(best&&(best.fz>0||best.score<q*10*.55||(alts[1]&&!best.full&&alts[1].score>best.score-1&&alts[1].food.k!==food.k)));
   // обобщённое мясо («свинина») без уточнения: по умолчанию готовый средний отруб, но предлагаем уточнить отруб

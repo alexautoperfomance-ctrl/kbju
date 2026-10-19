@@ -132,6 +132,9 @@ for line in open('tools/dishes.txt',encoding='utf8'):
         rk,rp,rf_,rc=map(float,ref.split('/')); rec['ref']=[rk,rp,rf_,rc]; v=(rk,rp,rf_,rc); rec['ds']='ru-ref'
     else: v=(k100,p100,f100,c100); rec['ds']='recipe'
     old=items.get(n)
+    # аудит v1.12: расчёт по рецептуре без справочного значения расходится со справочным (data_base, calorizator/Скурихин/USDA) >15% — верим справочному
+    if not ref and old and old['k'] and abs(k100-old['k'])/old['k']>0.15 and n not in ('макароны','пшенка'):  # эти сверены в tests/ref.test.js
+        v=(old['k'],old['p'],old['f'],old['c']); rec['ref']=list(v); rec['ds']='ru-ref'; rec['audit']='calc %d → ref %d'%(round(k100),old['k'])
     rec['old']=[old['k'],old['p'],old['f'],old['c']] if old else None
     if old:
         old.update(k=round(v[0]),p=round(v[1],1),f=round(v[2],1),c=round(v[3],1)); old['s']=list(dict.fromkeys(old['s']+[x.replace('ё','е') for x in syn])); old['cat']=old['cat'] if old['cat'] in('dish','bread','grain','egg') else 'dish'
@@ -169,6 +172,17 @@ GEN={'свинина':(201,27.5,9.2,'f','USDA SR 167855 pork composite (leg, loi
  'баранина':(206,28.2,9.5,'f','USDA SR 174308 lamb composite lean, cooked',['баранина жареная']),
  'курица':(219,24.7,12.6,'f','USDA SR 171051 chicken meat+skin, stewed',['куриная грудка отварная','курица жареная'])}
 for n in [x for x in items if x.startswith('трайфл')]: items[n]['po']=150; items[n]['pc']=150  # кафе/магазин: стаканчик ~150 г
+# пицца: вес целой по диаметру (pz {см: г}); Den's Pizza — с сайта dens-pizza.ru (2026-10-19), прочие — 520 г на 30 см (Den's «Пепперони»), масштаб по площади в parser.js
+PZ={"пицца пепперони (Den's Pizza)": {22: 310, 30: 520, 38: 850}, "пицца маргарита (Den's Pizza)": {22: 350, 30: 560, 38: 780}, "пицца с ветчиной и сыром (Den's Pizza)": {22: 320, 30: 550, 38: 940}, "пицца сырная (Den's Pizza)": {22: 330, 30: 450, 38: 920}, "пицца двойная пепперони (Den's Pizza)": {22: 340, 30: 550, 38: 800}, "пицца четыре сыра (Den's Pizza)": {22: 330, 30: 560, 38: 900}, "пицца мясная (Den's Pizza)": {22: 400, 30: 630, 38: 1000}, "пицца с ананасами и копченой курочкой (Den's Pizza)": {22: 350, 30: 590, 38: 1000}, "пицца бургер (Den's Pizza)": {22: 390, 30: 700, 38: 1150}, "пицца овощная (Den's Pizza)": {22: 370, 30: 600, 38: 960}, "пицца трюфельная пепперони (Den's Pizza)": {22: 300, 30: 510}}
+for n,z in PZ.items():
+    if n in items: items[n]['pz']=z; items[n]['rs']='dens-pizza.ru'
+for n in items:
+    if n.startswith('пицца') and items[n]['cat'] in ('dish','more','f','') or n in('пицца','пицца маргарита','пицца пепперони'): items[n]['po']=130
+# реалистичные штучные/порционные веса (аудит v1.11.3): pc — 1 шт, po — порция по умолчанию
+PORT={'роллы филадельфия':(30,240,1),'суши':(30,200,1),'беляш':(110,110,0),'наггетсы':(18,110,1)}
+for n,(pc_,po_,pl_) in PORT.items():
+    if n in items: items[n]['pc']=pc_; items[n]['po']=po_; items[n]['pl']=pl_
+if 'пирожок с картошкой' in items: items['пирожок с картошкой']['s']=list(dict.fromkeys(items['пирожок с картошкой']['s']+['пирожок','пирожки']))
 COOKED={'свиная вырезка готовая':(143,26.17,3.51,'USDA SR 168250 pork tenderloin lean, cooked, roasted')}
 for n,(k,p_,f_,g,src,amb) in GEN.items(): COOKED[n+' готов'+('ая' if g=='f' else 'ый')]=(k,p_,f_,src)
 for n,(k,p_,f_,src) in COOKED.items():
