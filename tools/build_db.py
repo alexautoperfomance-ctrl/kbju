@@ -168,6 +168,7 @@ GEN={'свинина':(201,27.5,9.2,'f','USDA SR 167855 pork composite (leg, loi
  'говядина':(230,28.4,12.4,'f','USDA SR 170609 beef composite lean+fat 0" trim, cooked',['говяжья вырезка','говядина жареная']),
  'баранина':(206,28.2,9.5,'f','USDA SR 174308 lamb composite lean, cooked',['баранина жареная']),
  'курица':(219,24.7,12.6,'f','USDA SR 171051 chicken meat+skin, stewed',['куриная грудка отварная','курица жареная'])}
+for n in [x for x in items if x.startswith('трайфл')]: items[n]['po']=150; items[n]['pc']=150  # кафе/магазин: стаканчик ~150 г
 COOKED={'свиная вырезка готовая':(143,26.17,3.51,'USDA SR 168250 pork tenderloin lean, cooked, roasted')}
 for n,(k,p_,f_,g,src,amb) in GEN.items(): COOKED[n+' готов'+('ая' if g=='f' else 'ый')]=(k,p_,f_,src)
 for n,(k,p_,f_,src) in COOKED.items():

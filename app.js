@@ -1,5 +1,5 @@
 'use strict';
-const VER='1.11.1';
+const VER='1.11.2';
 const $=s=>document.querySelector(s), R=Math.round, esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const MEALS=['завтрак','обед','ужин','перекус'], MI={завтрак:'🍳',обед:'🍲',ужин:'🍽️',перекус:'🍎'};
 const KEY='kbju.v1';
@@ -292,9 +292,10 @@ function renderVoice(){ const rm=V.mode==='recipe', ex=rm?'«500 грамм ри
   <div id="vres" style="margin-top:10px"></div>`); }
 function renderItems(){ const el=$('#vres'); if(!el)return; if(!V.items.length){el.innerHTML='';return} const rm=V.mode==='recipe';
   const t=tot(V.items.filter(i=>i.food));
-  el.innerHTML=V.items.map((it,i)=>`<div class="pi"><div class="top"><button class="nm ${it.food?'':'bad'}" data-pick="${i}">${it.food?esc(it.food.n):'❓ «'+esc(it.text)+'» — выбрать'} <span class="mu">▾</span></button><b>${it.food?R(it.k)+' ккал':''}</b></div>
+  el.innerHTML=V.items.map((it,i)=>`<div class="pi"><div class="top"><button class="nm ${it.food?'':'bad'}" data-pick="${i}">${it.food?esc(it.food.n):'❓ «'+esc(it.text)+'» — не нашлось'} <span class="mu">▾</span></button><b>${it.food?R(it.k)+' ккал':''}</b></div>
    <div class="ctl">${rm?'<span></span>':`<select data-imeal="${i}">${MEALS.map(m=>`<option ${it.meal===m?'selected':''}>${m}</option>`).join('')}</select>`}<div class="row"><input type="number" inputmode="numeric" data-ig="${i}" value="${R(it.g)}"><span class="mu">г</span></div><button class="x" data-idel="${i}">✕</button></div>
    ${it.food?`<div class="mu" style="margin-top:4px">${chips(it)} <span>«${esc(it.raw)}»</span></div>`:''}${it.note?`<div class="mu inote">🍽 ${esc(it.note)}</div>`:''}
+   ${!it.food?`<div class="cands"><span class="mu">${it.cands&&it.cands.length?'Похожее: ':'В базе нет. '}</span>${(it.cands||[]).map((c,j)=>`<button class="chip" data-cand="${i}:${j}">${esc(c.n)}</button>`).join('')}<button class="chip" data-pick="${i}">найти / добавить…</button></div>`:''}
    ${it.unsure&&it.cands&&it.cands.length>1?`<div class="cands"><span class="mu">Точно? </span>${it.cands.map((c,j)=>`<button class="chip${j===0?' on':''}" data-cand="${i}:${j}">${esc(c.n)}</button>`).join('')}<button class="chip" data-pick="${i}">другое…</button></div>`:''}</div>`).join('')+
    `<div class="card" style="margin-top:6px"><div class="kv"><span>Итого</span><span><b>${R(t.k)}</b> ккал · ${chips(t)}</span></div><div class="row" style="margin-top:8px"><button class="btn sp" data-vsave="1">${rm?'Готово':'✅ Записать в дневник'}</button></div></div>` }
 function doParse(text){ const mealSel=$('#vmeal')&&$('#vmeal').value; const r=KP.parse(text,{index:index(),meal:mealSel||V.meal||(cur===dk()?null:'обед')||KP.defaultMeal(),noMeals:V.mode==='recipe'||!!mealSel});
@@ -344,7 +345,7 @@ function micUI(){ document.querySelectorAll('.micb,.mic').forEach(b=>b.classList
 function micCancel(){ if(MIC.on||MIC.sr){ micCommit(); micReset(); mlog('cancel') } }
 const micBtn=(target,act)=>`<button class="micb" data-mict="${target}" data-mica="${act}" aria-label="Диктовать">🎙️</button>`;
 const pl=(n,a,b,c)=>{n=Math.abs(n)%100;const m=n%10;return n>10&&n<20?c:m===1?a:m>1&&m<5?b:c};
-function saveVoice(){ const ok=V.items.filter(i=>i.food&&i.g>0); if(!ok.length){toast('Нечего сохранять');return}
+function saveVoice(){ const ok=V.items.filter(i=>i.food&&i.g>0), miss=V.items.filter(i=>!i.food); if(miss.length&&!confirm('Не нашлось: '+miss.map(i=>'«'+i.text+'»').join(', ')+'. Записать остальное без них?'))return; if(!ok.length){toast('Нечего сохранять — выбери продукт');return}
   if(V.mode==='recipe'){ RE.ings=RE.ings.concat(ok.map(i=>({n:i.food.n,g:R(i.g),k:i.food.k,p:i.food.p,f:i.food.f,c:i.food.c,m:i.food.m||microOf(i.food.n)||undefined}))); closeSheet(); openRecipe(); return }
   const L=S.days[cur]=day(cur).slice(); ok.forEach(i=>{ L.push({id:uid(),meal:i.meal,name:i.food.n,g:R(i.g),k:i.k,p:i.p,f:i.f,c:i.c,k100:i.food.k,p100:i.food.p,f100:i.food.f,c100:i.food.c,cat:i.food.cat||'',src:i.food.src||'',m100:i.food.m||undefined,note:i.note||undefined}); S.used[i.food.n]=(S.used[i.food.n]||0)+1 });
   save(); dirty(); closeSheet(); render(); toast(`Записано: ${ok.length} · ${R(tot(ok).k)} ккал`) }

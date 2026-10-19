@@ -31,7 +31,7 @@ function stem(w){ if(IRR[w])return IRR[w]; if(/\d/.test(w)||w.length<=3)return w
   for(const e of ENDS) if(w.endsWith(e)&&w.length-e.length>=3){w=w.slice(0,-e.length);break}
   w=w.replace(/(е|о)чк$/,'к'); return IRR[w]||w }
 function norm(s){ return (' '+String(s).toLowerCase().replace(/ё/g,'е')+' ')
-  .replace(/(\d)[,.](\d)/g,'$1.$2').replace(/(\d)\s*(процент\S*|%)/g,'$1% ')
+  .replace(/макаронс\S*/g,'макаруны').replace(/(трайфл\S*|трифл\S*)\s+в\s+стаканчик\S*/g,'$1').replace(/(\d)[,.](\d)/g,'$1.$2').replace(/(\d)\s*(процент\S*|%)/g,'$1% ')
   .replace(/(\d)(г|гр|кг|мл|л|шт)(?=[\s.,;]|$)/g,'$1 $2')
   .replace(/(\s)пол(?=(бутылк|упаковк|стакан|тарелк|порци|литр|кило|банк|ложк|кружк|чашк|пачк|плитк|батон|буханк|кусочк|кусок|куска|банан|яблок|апельсин|авокадо|огурц|помидор|грейпфрут|лимон|пицц|лепешк|лаваш|булк|багет|шаурм|шаверм|пачк))/g,'$1пол ')
   .replace(/[«»"!?()]/g,' ').replace(/ - /g,' ').replace(/\s+/g,' ') }
@@ -105,6 +105,11 @@ function parseChunk(index,ts){ // одна позиция: количество 
   if(num==null&&unit&&unit[1]==='g'&&/^(грамм|гр|г)/.test('')){}
   const text=food.join(' ').trim(); return {num,unit,size,tsp,text,whole} }
 function edibleWord(f){ return f&&f.cat==='nut'?'ядра':f&&/яйц/.test(f.n)?'без скорлупы':f&&/fish|meat/.test(f.cat||'')?'без костей':'мякоти' }
+// не нашлось: ближайшие по буквам (триграммы), чтобы предложить, а не подставлять молча
+function suggest(index,text,n){ const tg=w=>{w='  '+w+' ';const s=new Set();for(let i=0;i<w.length-2;i++)s.add(w.slice(i,i+3));return s};
+  const q=tg(tokens(text).join(' ')); if(q.size<3)return []; const out=[];
+  for(const it of index){ if(it.f.src==='offru')continue; let b=0; [it.f.n].concat(it.f.s||[]).forEach(nm=>{ const t=tg(String(nm).toLowerCase().replace(/ё/g,'е')); let c=0; q.forEach(x=>{if(t.has(x))c++}); const v=2*c/(q.size+t.size); if(v>b)b=v }); if(b>=.3)out.push([b,it.f]) }
+  return out.sort((a,b)=>b[0]-a[0]).slice(0,n||3).map(x=>x[1]) }
 function resolve(index,ch,raw,meal){ const alts=search(index,ch.text,6); const best=alts[0]||null; const food=best&&best.food;
   let g=grams(food,ch.num,ch.unit,ch.size,ch.tsp), note='';
   const pcs=food&&food.pc&&(!ch.unit||/^pcs?$/.test(ch.unit[1]))&&!(ch.num>=20&&!ch.unit);
@@ -115,6 +120,7 @@ function resolve(index,ch,raw,meal){ const alts=search(index,ch.text,6); const b
   // обобщённое мясо («свинина») без уточнения: по умолчанию готовый средний отруб, но предлагаем уточнить отруб
   let amb=null; if(food&&food.amb&&food.amb.length&&best.full){ amb=[food].concat(food.amb.map(n=>{const a=search(index,n,1)[0];return a&&a.food.n===n?a.food:null}).filter(Boolean)) }
   const cands=amb?amb.slice(0,3):[]; if(!amb)alts.forEach(a=>{ if(cands.length<3&&!cands.some(c=>c.n===a.food.n||(c.k===a.food.k&&c.p===a.food.p&&c.f===a.food.f)))cands.push(a.food) }); const r={meal,text:ch.text,raw,g,num:ch.num,unit:ch.unit&&ch.unit[1],food,recipe:!!(best&&best.recipe),alts:alts.map(a=>a.food),full:!!(best&&best.full),all:!!(best&&best.all),unsure:unsure||!!(amb&&amb.length>1),cands,note};
+  if(!food){ r.cands=suggest(index,ch.text,3); r.miss=true }
   if(food)Object.assign(r,nutr(food,g)); return r }
 function chunkHasQty(ts){ return ts.some((t,i)=>readNum(ts,i)||unitOf(t)) }
 function parse(text,opt){ opt=opt||{}; const index=opt.index||makeIndex(opt.foods||[],opt.recipes||[]);
