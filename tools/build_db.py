@@ -187,8 +187,23 @@ def por_ok(n,po,pos):
 CHK=collections.Counter(); ALI={}
 for it in items.values():
     for a in it['s']: ALI.setdefault(a,it)
-for x in json.load(open('tools/dishes_chain.json',encoding='utf8')):
-    n=x['n']; po=por_ok(n,x['po'],x['pos']); old=items.get(n) or ALI.get(n)
+# v1.18.1: «плов из говядины» (2 заведения) и «плов с говядиной» (14) — одно блюдо: имена, совпадающие без предлогов,
+# сливаем в вариант с бо́льшим числом заведений; слабый вариант становится его синонимом.
+DCH=json.load(open('tools/dishes_chain.json',encoding='utf8')); PREP={'с','со','из','в','на','и'}
+dst=lambda w:re.sub(r'(ой|ей|ою|ами|ями|ом|ем|ы|и|а|я|у|ю|е|о)$','',w) if len(w)>=5 else w  # «говядины»/«говядиной» → «говядин»
+dkey=lambda n:n.split()[0]+' '+' '.join(dst(w) for w in n.split()[1:] if w not in PREP); BEST={}  # первое слово как есть: «блин» (1 шт) ≠ «блины» (порция)
+for x in DCH:
+    kk=dkey(x['n'])
+    if kk not in BEST or x['v']>BEST[kk]['v']: BEST[kk]=x
+DUP={}
+for x in DCH:
+    b=BEST[dkey(x['n'])]
+    if b is not x and x['n'] not in items and x['n'] not in ALI and abs(x['k']-b['k'])<=.25*b['k'] or b is not x and x['n'] not in items and x['n'] not in ALI and b['v']>=3*x['v']: DUP[x['n']]=b['n']  # калории согласны ±25% или у основного варианта втрое больше заведений
+CHK['merged']=len(DUP)
+for x in DCH:
+    n=x['n']
+    if n in DUP: continue
+    po=por_ok(n,x['po'],x['pos']); old=items.get(n) or ALI.get(n)
     if old:
         if old['k'] and abs(x['k']-old['k'])/old['k']<=0.25:
             CHK['ref+chain']+=1; old['rs2']='сети: медиана %d заведений'%x['v']
@@ -196,6 +211,9 @@ for x in json.load(open('tools/dishes_chain.json',encoding='utf8')):
         else: CHK['ref wins']+=1
         continue
     add(n,[],x['k'],x['p'],x['f'],x['c'],None,po,'dish','base'); items[n]['ds']='chains'; items[n]['rs']='медиана %d заведений'%x['v']; CHK['new']+=1
+for d,b in DUP.items():
+    t=items.get(b) or ALI.get(b)
+    if t and d not in t['s']: t['s'].append(d)
 print('блюда из сетей:',dict(CHK))
 PZ={}  # бренды пиццерий — в chains.js (tools/build_chains.py)
 for n,z in PZ.items():

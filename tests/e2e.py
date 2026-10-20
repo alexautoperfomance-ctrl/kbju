@@ -23,7 +23,7 @@ async def main():
     await c.add_init_script(FAKE); pg=await c.new_page()
     pg.on('console',lambda m: m.type=='error' and errs.append(m.text)); pg.on('pageerror',lambda e: errs.append(str(e)))
     await pg.goto(URL); await pg.wait_for_selector('#nav button')
-    assert 'v1.18.0' in await pg.inner_text('#ver')
+    assert 'v1.18.1' in await pg.inner_text('#ver')
     assert await pg.locator('text=🔊').count()==0, 'нет кнопок озвучки'
     # --- микрофон-переключатель: 3 сессии (iOS-рестарты) до нажатия «стоп»
     await pg.evaluate("window.__chunks=['на завтрак два яйца','и кофе с молоком','на обед 200 грамм гречки и куриная грудка']")
