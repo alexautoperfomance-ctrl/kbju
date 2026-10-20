@@ -211,6 +211,12 @@ function segment(index,ws){ const n=ws.length; if(n<2||n>14)return null; const o
   const segs=r.segs.map(x=>x.slice()); for(let i=0;i<n;i++){ if(segs.some(x=>i>=x[0]&&i<x[1])||!QUAL.test(ws[i]))continue; const nx=segs.find(x=>x[0]===i+1)||segs.find(x=>x[0]>i), pv=segs.slice().reverse().find(x=>x[1]===i);
     const tgt=nx&&nx[0]===i+1?nx:pv||nx; if(!tgt)continue; const cand=tgt[0]>i?[i,tgt[1]]:[tgt[0],i+1], b=search(index,ws.slice(cand[0],cand[1]).filter((w,k)=>cand[0]+k===i||(k+cand[0]>=tgt[0]&&k+cand[0]<tgt[1])).join(' '),1)[0]; if(b&&b.all){ tgt.q=(tgt.q||[]).concat(i) } }
   const out=segs.map(x=>ws.slice(x[0],x[1]).concat((x.q||[]).map(i=>ws[i])).join(' ')); out.r=segs; return out }
+// v1.18.3: «кофе капучино халва» — один напиток: «кофе X» → X; «X халва/карамель…» без граммов → X с сиропом
+const DRINK='(капучино|латте|раф|флэт\\s+уайт|флет\\s+уайт|какао|матча\\s+латте|матча|американо|эспрессо|мокко|мокачино)';
+const FLAV='(?:солен\\S*\\s+)?(?:халв\\S*|карамел\\S*|ванил\\S*|кокос\\S*|лаванд\\S*|орех\\S*|орехов\\S*|фундук\\S*|миндал\\S*|фисташ\\S*|попкорн\\S*|пряни\\S*|тыкв\\S*|мед|медов\\S*|шоколад\\S*|кориц\\S*|имбир\\S*|апельсин\\S*|малин\\S*|клубни\\S*|вишн\\S*|банан\\S*|мят\\S*|ирис\\S*|сгущ\\S*|сливочн\\S*|маршмел\\S*|кленов\\S*|бабл\\S*|чизкейк\\S*|печень\\S*|амарет\\S*|баунти|сникерс|твикс|нутелл\\S*)';
+function drinks(t){ t=t.replace(/(^|\s)чай\s+латте(?=\s)/g,'$1латте').replace(new RegExp('(^|\\s)кофе\\s+'+DRINK+'(?=\\s)','g'),'$1$2');
+  if(CUR_CHAIN)return t;
+  return t.replace(new RegExp('(^|\\s)'+DRINK+'((?:\\s+(?:и\\s+)?'+FLAV+')+)(?=\\s)','g'),(m,a,d,f)=>{ if(/^матча/.test(d))return a+'матча латте'; const x=d.replace(/^(мокко|мокачино)$/,'латте').replace(/^эспрессо$/,'кофе'); return a+x+' с сиропом' }) }
 function chunkHasQty(ts){ return ts.some((t,i)=>readNum(ts,i)||unitOf(t)) }
 function parse(text,opt){ opt=opt||{}; const index=opt.index||makeIndex(opt.foods||[],opt.recipes||[]);
   // несколько мест в одной фразе: «пепперони додо, чизбургер вкусно и точка» — каждое место к своей части
@@ -218,7 +224,7 @@ function parse(text,opt){ opt=opt||{}; const index=opt.index||makeIndex(opt.food
       const cl=ph.split(/\s*[,;]\s*|\s+и\s+(?=\S)/).map(c=>c.replace(/§(\d+)§/g,(m0,k)=>keep[+k])).filter(x=>x.trim()); if(0)n0.split(/\s*[,;]\s*|\s+и\s+(?=\S)/).filter(x=>x.trim()); const groups=[]; let cur=null;
       cl.forEach(c=>{ const has=!!chainDetect(' '+c+' '); if(!cur||has&&cur.has){ cur={t:[],has:false}; groups.push(cur) } cur.t.push(c); if(has)cur.has=true });
       if(groups.length>1){ let res=[]; const o2=Object.assign({},opt,{index,_one:true}); groups.forEach(g=>{ res=res.concat(parse(g.t.join(', '),o2)) }); return res } } }
-  let nt=norm(text); const chd=chainDetect(nt); CUR_CHAIN=chd&&chainLoaded(chd.slug)?chd.slug:null; if(chd)nt=chd.rest; nt=speech(nt);
+  let nt=norm(text); const chd=chainDetect(nt); CUR_CHAIN=chd&&chainLoaded(chd.slug)?chd.slug:null; if(chd)nt=chd.rest; nt=drinks(speech(nt));
   const ts0=(nt.replace(/(^|\s)(с|со|в)\s+(кожур|кожиц|шкурк|скорлуп)[а-я]*/g,' целиком').replace(/[,;]/g,' , ').match(/[a-zа-я0-9.%-]+|,/g)||[]);
   for(let i=0;i<ts0.length;i++){ const r=readNum(ts0,i); if(r&&/^процент/.test(ts0[r.j]||'')){ ts0.splice(i,r.j-i+1,r.v+'%') } }
   const segs=opt.noMeals?[{meal:opt.meal||null,ts:ts0}]:splitMeals(ts0,opt.meal||defaultMeal(opt.now));
