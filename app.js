@@ -1,5 +1,5 @@
 'use strict';
-const VER='1.17.0';
+const VER='1.18.0';
 const $=s=>document.querySelector(s), R=Math.round, esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const MEALS=['завтрак','обед','ужин','перекус'], MI={завтрак:'🍳',обед:'🍲',ужин:'🍽️',перекус:'🍎'};
 const KEY='kbju.v1';
@@ -294,6 +294,7 @@ function renderVoice(){ const rm=V.mode==='recipe', ex=rm?'«500 грамм ри
   sheet(`<div class="sh"><h2>${rm?'Ингредиенты голосом':'Что ты съел?'}</h2><button class="x" data-close="1">✕</button></div>
   <button class="mic" id="mic" data-mict="vt" data-mica="parse" aria-label="Микрофон">🎙️</button><div class="mu" style="text-align:center" id="mst">${SR?'Нажми и говори':'Нажми 🎙️ или 🎤 на клавиатуре'}</div>
   ${!SR||isIOS?`<div class="hint">📱 Надёжнее всего на iPhone: 🎤 <b>на клавиатуре</b> — диктовка не обрывается, потом «Разобрать».</div>`:''}
+  ${rm?'':`<label class="btn s w phb">📷 Сфотографировать продукт, этикетку или блюдо<input type="file" id="phin" accept="image/*" hidden></label>`}
   <textarea id="vt" placeholder="${ex}"></textarea><div class="row" style="margin-top:6px">${rm?'':`<select id="vmeal" style="width:auto"><option value="">приём по фразе/времени</option>${MEALS.map(m=>`<option ${V.meal===m?'selected':''}>${m}</option>`).join('')}</select>`}<button class="btn sp" id="vparse">Разобрать</button></div>
   <div id="vres" style="margin-top:10px"></div>`); }
 function renderItems(){ const el=$('#vres'); if(!el)return; if(!V.items.length){el.innerHTML='';return} const rm=V.mode==='recipe';
@@ -388,6 +389,8 @@ async function offSearch(){ const q=$('#pq').value.trim(); if(!q)return; $('#pre
   const tries=[cgi,()=>new Promise(r=>setTimeout(r,1500)).then(cgi)];
   for(const t of tries){ try{ const r=(await t()).filter(ok).map(offMap); if(r.length){PR=r;$('#pres').innerHTML=resHtml(PR);return} }catch(e){} }
   $('#pres').innerHTML='<div class="empty">Ничего не нашлось или нет связи с Open Food Facts</div>' }
+async function offCode(code){ const r=await fetch('https://world.openfoodfacts.org/api/v2/product/'+encodeURIComponent(code)+'.json?fields=code,product_name,product_name_ru,brands,nutriments,serving_quantity'); const j=await r.json();
+  return j.status===1&&j.product&&j.product.nutriments&&(j.product.nutriments['energy-kcal_100g']!=null||j.product.nutriments.energy_100g!=null)?offMap(j.product):null }
 async function offBarcode(code){ $('#pres').innerHTML='<div class="empty">Штрихкод '+esc(code)+'…</div>';
   try{ const r=await fetch('https://world.openfoodfacts.org/api/v2/product/'+encodeURIComponent(code)+'.json?fields=code,product_name,product_name_ru,brands,nutriments,serving_quantity'); const j=await r.json();
     if(j.status===1&&j.product){PR=[offMap(j.product)];$('#pres').innerHTML=resHtml(PR)} else $('#pres').innerHTML='<div class="empty">Товар '+esc(code)+' не найден в Open Food Facts. Добавь его как свой продукт.</div>' }catch(e){ $('#pres').innerHTML='<div class="empty">Нет связи</div>' } }
@@ -403,6 +406,70 @@ async function scan(){ const box=$('#pres'); box.innerHTML='<video id="cam" play
     rd.decodeFromVideoElementContinuously(v,(res)=>{ if(res)done(res.getText()) }); }catch(e){ box.insertAdjacentHTML('beforeend','<div class="empty">Сканер не загрузился — введи цифры штрихкода в поиск.</div>') } }
 function customForm(){ $('#pres').innerHTML=`<div class="card" style="margin-top:8px"><label>Название</label><input id="cn" value="${esc($('#pq').value)}"><div class="g4"><div><label>Ккал/100</label><input id="ck" type="number" inputmode="decimal"></div><div><label>Б</label><input id="cp" type="number" inputmode="decimal"></div><div><label>Ж</label><input id="cf" type="number" inputmode="decimal"></div><div><label>У</label><input id="cc" type="number" inputmode="decimal"></div></div><label>Порция, г</label><input id="cpo" type="number" inputmode="numeric" value="100"><button class="btn w" style="margin-top:8px" data-csave="1">Сохранить продукт</button></div>` }
 function pickFood(f){ if(f.src==='off'&&!S.custom.some(c=>c.n===f.n)){S.custom.push(f);save();dirty()} scanStop&&scanStop(); closeSheet(2); PK&&PK.cb(f) }
+
+// ---------- 📷 Продукт по фото: штрихкод → Open Food Facts, иначе чтение этикетки (Tesseract), иначе поиск блюда по названию ----------
+let PH=null;
+const loadJS=(src,ok)=>ok()?Promise.resolve():new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s) });
+function phCanvas(url,max){ return new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>{ const sc=Math.min(1,max/Math.max(im.width,im.height)), c=document.createElement('canvas'); c.width=R(im.width*sc); c.height=R(im.height*sc); c.getContext('2d').drawImage(im,0,0,c.width,c.height); res(c) }; im.onerror=rej; im.src=url }) }
+const tmo=(p,ms)=>Promise.race([p,new Promise(r=>setTimeout(()=>r(null),ms))]);
+async function phBarcode(cv,url){
+  if('BarcodeDetector' in window){ try{ const r=await new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e']}).detect(cv); if(r[0])return r[0].rawValue }catch(e){} }
+  try{ await loadJS('https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js',()=>window.ZXing); const r=await tmo(new ZXing.BrowserMultiFormatReader().decodeFromImageUrl(url),6000); return r&&r.getText()||null }catch(e){ return null } }
+async function phOCR(cv,prog){ phOCR.prog=prog;
+  await loadJS('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js',()=>window.Tesseract);
+  if(!phOCR.w)phOCR.w=Tesseract.createWorker('rus',1,{logger:m=>{ if(m.status==='recognizing text'&&phOCR.prog)phOCR.prog(m.progress) }}).catch(e=>{ phOCR.w=null; throw e });
+  const w=await phOCR.w, r=await w.recognize(cv,{rotateAuto:true}); return r.data.text||'' }
+function phSt(t){ PH.st=t; const e=$('#phst'); if(e)e.textContent=(PH.busy?'⏳ ':'')+t; else photoRender() }
+function phFill(f,src){ Object.assign(PH,{name:f.n,k:R(f.k),p:+(+f.p).toFixed(1),f:+(+f.f).toFixed(1),c:+(+f.c).toFixed(1),food:f,src,busy:false,st:'Нашёл: '+src+'. Проверь граммы и приём пищи.'});
+  if(!PH.g)PH.g=f.pc&&f.pc<=600?R(f.pc):f.po&&f.po<=600?R(f.po):PH.net&&PH.net<=600?PH.net:100; photoRender() }
+async function photoStart(file){ const meal=($('#vmeal')&&$('#vmeal').value)||V.meal||(cur===dk()?KP.defaultMeal():'обед'), url=URL.createObjectURL(file);
+  if(PH&&PH.url)URL.revokeObjectURL(PH.url);
+  PH={url,st:'Ищу штрихкод…',name:'',k:'',p:'',f:'',c:'',g:'',meal,warn:'',names:[],busy:true,sug:[]}; photoRender(); const me=PH;
+  let cv; try{ cv=await phCanvas(url,1800) }catch(e){ PH.busy=false; phSt('Не удалось открыть фото'); return }
+  const code=await phBarcode(cv,url); if(PH!==me)return;
+  if(code){ PH.code=code; const own=S.custom.find(c=>c.code===code); if(own){ phFill(own,'твой продукт, штрихкод '+code); return }
+    phSt('Штрихкод '+code+', ищу в Open Food Facts…'); const f=await tmo(offCode(code).catch(()=>null),8000); if(PH!==me)return; if(f&&f.k){ phFill(f,'Open Food Facts, штрихкод '+code); return } }
+  phSt('Читаю этикетку… Первый раз загружается распознавание текста, это может занять до минуты.');
+  try{ const text=await phOCR(cv,p=>{ if(PH===me)phSt('Читаю этикетку… '+R(p*100)+'%') }); if(PH!==me)return; const r=LBL.parse(text); PH.ocr=text; PH.names=r.names; PH.net=r.net;
+    if(r.found>=2&&(r.k!=null||r.p!=null)){ Object.assign(PH,{k:r.k==null?'':R(r.k),p:r.p==null?'':r.p,f:r.f==null?'':r.f,c:r.c==null?'':r.c,warn:r.warn,src:'этикетка'}); PH.g=r.net&&r.net<=600?r.net:100;
+      PH.st='Цифры с этикетки (на 100 г). Сверь с упаковкой, впиши название и сколько съел.' }
+    else PH.st='КБЖУ на фото не нашёл. Если это блюдо, напиши или скажи его название, и я возьму КБЖУ из базы. Если упаковка, впиши цифры с этикетки или сфотографируй её ближе.' }
+  catch(e){ if(PH!==me)return; PH.st='Распознавание текста не загрузилось (нужен интернет). Впиши название или цифры вручную.' }
+  PH.busy=false; photoRender() }
+function phTot(){ const g=+PH.g||0, f={k:+PH.k||0,p:+PH.p||0,f:+PH.f||0,c:+PH.c||0}; if(!f.k)f.k=R(f.p*4+f.f*9+f.c*4); return {f,g,n:KP.nutr(f,g)} }
+function phSumHtml(){ const x=phTot(); return x.g&&(x.f.k||x.f.p||x.f.c)?`<div class="kv"><span>${R(x.g)} г</span><span><b>${R(x.n.k)}</b> ккал · ${chips(x.n)}</span></div>`:'<div class="mu">Впиши КБЖУ на 100 г и граммы</div>' }
+function phSugHtml(){ return (PH.sug||[]).map((f,i)=>`<button class="chip phs" data-phsug="${i}">${esc(f.n)} <span class="mu">${R(f.k)} ккал</span></button>`).join('') }
+function phSuggest(){ const q=(PH.name||'').trim(); PH.sug=q.length>=2?KP.search(index(),q,6).map(x=>x.food):[]; const e=$('#phsug'); if(e)e.innerHTML=phSugHtml() }
+function photoRender(){ if(!PH)return; const P=PH, inp=(id,v,l)=>`<div><label>${l}</label><input id="${id}" type="number" inputmode="decimal" value="${esc(v)}"></div>`;
+  sheet(`<div class="sh"><h2>📷 Продукт по фото</h2><button class="x" data-phclose="1">✕</button></div>
+  <img class="phimg" src="${P.url}" alt=""><div class="mu" id="phst" style="margin:4px 0">${P.busy?'⏳ ':''}${esc(P.st)}</div>
+  <label>Название</label><div class="row"><input id="phn" value="${esc(P.name)}" placeholder="например: сырок творожный, пельмени, борщ">${micBtn('phn','phsearch')}</div>
+  ${P.names.length&&!P.name?`<div class="cands"><span class="mu">С упаковки: </span>${P.names.map((n,i)=>`<button class="chip" data-phname="${i}">${esc(n)}</button>`).join('')}</div>`:''}
+  <div class="cands" id="phsug">${phSugHtml()}</div>
+  <div class="mu" style="margin-top:4px">На 100 г${P.src?' · '+esc(P.src):''}</div><div class="g4">${inp('phk',P.k,'Ккал')}${inp('php',P.p,'Б')}${inp('phf',P.f,'Ж')}${inp('phc',P.c,'У')}</div>
+  ${P.warn?`<div class="hint">⚠️ ${esc(P.warn)}</div>`:''}
+  <div class="g2"><div><label>Съел, г</label><input id="phg" type="number" inputmode="numeric" value="${esc(P.g)}"></div><div><label>Куда записать</label><select id="phm">${MEALS.map(m=>`<option ${P.meal===m?'selected':''}>${m}</option>`).join('')}</select></div></div>
+  ${P.net&&P.net!=P.g?`<div class="cands"><button class="chip" data-phg="${P.net}">вся упаковка ${P.net} г</button></div>`:''}
+  <div id="phsum" style="margin-top:4px">${phSumHtml()}</div>
+  <button class="btn w" style="margin-top:6px" data-phsave="1">✅ В базу и в дневник${cur!==dk()?' ('+esc(fmtD(cur))+')':''}</button>
+  <div class="mu" style="margin-top:4px">Продукт сохранится в твою базу, потом его можно просто назвать голосом.</div>
+  ${P.ocr?`<details class="mu" style="margin-top:6px"><summary>Распознанный текст</summary><pre class="phocr">${esc(P.ocr)}</pre></details>`:''}`,2) }
+function phSync(){ if(!PH)return; const v=id=>{ const e=$('#'+id); return e?e.value:'' }; Object.assign(PH,{name:v('phn'),k:v('phk'),p:v('php'),f:v('phf'),c:v('phc'),g:v('phg'),meal:v('phm')||PH.meal}) }
+function photoSave(){ phSync(); const P=PH, n=P.name.trim(), x=phTot(); if(!n)return toast('Впиши название');
+  if(!x.f.k)return toast('Впиши КБЖУ на 100 г'); if(!x.g)return toast('Сколько грамм съел?');
+  const base=P.food, same=base&&base.n===n&&R(base.k)===R(x.f.k)&&R(base.p)===R(x.f.p)&&R(base.f)===R(x.f.f)&&R(base.c)===R(x.f.c), inDB=same&&base.src!=='off';
+  const f={n,k:R(x.f.k),p:x.f.p,f:x.f.f,c:x.f.c,po:R(x.g),src:'photo',cat:base&&base.cat||'',m:same&&base.m?base.m:undefined,code:P.code||undefined};
+  let saved=false; if(!inDB){ const i=S.custom.findIndex(c=>c.n.toLowerCase()===n.toLowerCase()); if(i>=0)S.custom[i]=Object.assign({},S.custom[i],f); else S.custom.push(f); saved=true }
+  (S.days[cur]=day(cur).slice()).push({id:uid(),meal:P.meal,name:n,g:R(x.g),k:x.n.k,p:x.n.p,f:x.n.f,c:x.n.c,k100:f.k,p100:f.p,f100:f.f,c100:f.c,cat:f.cat,src:'photo',m100:f.m});
+  S.used[n]=(S.used[n]||0)+1; save(); dirty(); URL.revokeObjectURL(P.url); PH=null; closeSheet(2); closeSheet(); tab='diary'; render();
+  toast(`${n} ${R(x.g)} г, ${R(x.n.k)} ккал → ${P.meal}`+(saved?' · сохранено в базу':'')) }
+function photoClick(d){ if(!PH)return false;
+  if(d.phclose){ URL.revokeObjectURL(PH.url); PH=null; closeSheet(2); return true }
+  if(d.phname!=null){ phSync(); PH.name=PH.names[+d.phname]||''; photoRender(); phSuggest(); return true }
+  if(d.phsug!=null){ phSync(); const f=PH.sug[+d.phsug]; if(f){ PH.g=''; phFill(f,f.src==='recipe'?'твой рецепт':'база приложения'); PH.sug=[]; photoRender() } return true }
+  if(d.phg){ phSync(); PH.g=+d.phg; photoRender(); return true }
+  if(d.phsave){ photoSave(); return true } return false }
+function photoInput(t){ if(!PH||!/^ph[nkpfcgm]$/.test(t.id))return false; phSync(); if(t.id==='phn'){ PH.food=null; PH.src=PH.src==='этикетка'?PH.src:''; clearTimeout(phSuggest.t); phSuggest.t=setTimeout(phSuggest,150) } const e=$('#phsum'); if(e)e.innerHTML=phSumHtml(); return true }
 // ---------- рецепт ----------
 let RE=null;
 function openRecipe(r){ if(r)RE=JSON.parse(JSON.stringify(r)); if(!RE)RE={id:uid(),name:'',ings:[],yield:0,servings:1,_new:true}; const n=recipeNut(RE), raw=RE.ings.reduce((a,i)=>a+i.g,0);
@@ -458,14 +525,14 @@ function addEntry(f,g,meal){ const n=KP.nutr(f,g); (S.days[cur]=day(cur).slice()
 document.addEventListener('click',e=>{ const mr=e.target.closest('[data-mic]'); if(mr){openMicro(mr.dataset.mic);return}
   const t=e.target.closest('button,[data-edit],[data-pf],.sheet'); if(!t)return; const d=t.dataset;
   if(t.classList.contains('sheet')){ if(e.target===t)closeSheet(t.id==='sheet2'?2:1); return }
-  if(dictClick(d,t))return; if(tab==='menu'&&menuClick(d,t))return;
+  if(photoClick(d))return; if(dictClick(d,t))return; if(tab==='menu'&&menuClick(d,t))return;
   if(tab==='diary'&&calClick(d))return;
   if(d.tab){tab=d.tab;render();return} if(d.sm){statMode=d.sm;render();return}
   if(t.id==='prev'||t.id==='next'){cur=addD(cur,t.id==='prev'?-1:1);render();return}
   if(t.id==='fab'){openVoice();return} if(d.addm){openVoice(d.addm);return}
   if(d.close){closeSheet();return} if(d.close2){scanStop&&scanStop();closeSheet(2);return}
   if(d.micnext){ micNext(); return } if(d.micdone){ micDone(); return }
-  if(d.mict){ const act=d.mica; micStart(d.mict,t,v=>{ if(act==='parse'){ if(v){V.items=[];doParse(v)} } else if(act==='dict'){ if(v)dictRun(v) } else if(act==='search'){ showRes() } }); return } if(d.xsave&&V&&V.dish){ dishSave(); return } if(t.id==='vparse'){ micCancel(); const v=$('#vt').value; if(v.trim()){V.items=[];doParse(v)} return }
+  if(d.mict){ const act=d.mica; micStart(d.mict,t,v=>{ if(act==='parse'){ if(v){V.items=[];doParse(v)} } else if(act==='dict'){ if(v)dictRun(v) } else if(act==='search'){ showRes() } else if(act==='phsearch'){ phSync(); phSuggest() } }); return } if(d.xsave&&V&&V.dish){ dishSave(); return } if(t.id==='vparse'){ micCancel(); const v=$('#vt').value; if(v.trim()){V.items=[];doParse(v)} return }
   if(d.idel){V.items.splice(+d.idel,1);renderItems();return}
   if(d.pick){ const i=+d.pick, it=V.items[i]; openPicker(it.food?'':it.text,f=>{it.food=f; it.unsure=false; it.note=''; if(!it.num&&!it.unit)it.g=KP.grams(f,null,null,1); recalc(it); renderItems()},it.alts); return }
   if(d.cand){ const [i,j]=d.cand.split(':').map(Number), it=V.items[i], f=it.cands[j]; it.food=f; it.unsure=false; if(!(it.unit==='g'||(it.num>=20&&!it.unit)))it.g=KP.grams(f,it.num,it.unit?[0,it.unit,1]:null,1)||it.g; it.note=''; recalc(it); renderItems(); return }
@@ -500,6 +567,7 @@ document.addEventListener('click',e=>{ const mr=e.target.closest('[data-mic]'); 
 });
 function readProf(){ const p=S.prof; p.sex=$('#cs').value; p.a=+$('#ca').value||p.a; p.w=+$('#cw').value||p.w; p.h=+$('#ch').value||p.h; p.act=+$('#cact').value; p.goal=$('#cg').value }
 document.addEventListener('input',e=>{ const t=e.target,d=t.dataset;
+  if(photoInput(t))return;
   if(V&&V.dish&&(d.xg!=null||t.id==='xeat'||t.id==='xn')){ const D=V.dish; if(t.id==='xn'){D.name=t.value;D.auto=false;return} if(d.xg!=null){D.ings[+d.xg].g=+t.value||0;D.ings[+d.xg].est=false} else D.eat=t.value===''?null:+t.value||0; dishCalcV(); $('#xsum').innerHTML=dishSum(); const xe=$('#xeat'); if(xe)xe.placeholder=R(D.calc.cooked); return }
   if(d.ig!=null){ const it=V.items[+d.ig]; it.g=+t.value||0; it.note=''; const nt=t.closest('.pi').querySelector('.inote'); if(nt)nt.remove(); recalc(it); const top=t.closest('.pi').querySelector('.top b'); if(top&&it.food)top.textContent=R(it.k)+' ккал'; const cm=t.closest('.pi').querySelector('.mu[style]'); if(cm&&it.food)cm.innerHTML=chips(it)+' <span>«'+esc(it.raw)+'»</span>'; const tt=tot(V.items.filter(i=>i.food)), kv=$('#vres .card .kv span:last-child'); if(kv)kv.innerHTML='<b>'+R(tt.k)+'</b> ккал · '+chips(tt); return }
   if(t.id==='dg'&&DT){ DT.g=+t.value||0; $('#dbody').innerHTML=detailHtml(DT.name,DT.g,DT.f100,DT.m100); return }
@@ -510,7 +578,7 @@ document.addEventListener('input',e=>{ const t=e.target,d=t.dataset;
   if(t.id==='smicdbg'){S.set.micdbg=t.checked;save();const el=$('#micdbg');if(el){el.style.display=t.checked?'block':'none';el.textContent=t.checked?'🎙 отладка включена — нажми микрофон':''}return}
 });
 document.addEventListener('toggle',e=>{ const t=e.target; if(!t.classList)return; if(t.classList.contains('nutri')){S.set.nutriOpen=t.open;save()} else if(t.dataset&&t.dataset.k){S.set[t.dataset.k]=t.open;save()} },true);
-document.addEventListener('change',e=>{ const t=e.target,d=t.dataset; if(V&&V.dish&&(d.xon!=null||t.id==='xm'||t.id==='xmeal'||t.id==='xrec')){ const D=V.dish; if(d.xon!=null){D.ings[+d.xon].on=t.checked; if(D.auto)D.name=DICT.dishName(D.ings)} if(t.id==='xm')D.meth=t.value; if(t.id==='xmeal')D.meal=t.value; if(t.id==='xrec'){D.rec=t.checked;return} renderDish(); return } if(t.id==='rm'&&RE){ syncRecipe(); openRecipe(); return } if(d.dg!=null||d.dmeal!=null){ dictEdit(t); return } if(tab==='menu'&&menuChange(t))return; if(d.imeal!=null){V.items[+d.imeal].meal=t.value;return}
+document.addEventListener('change',e=>{ const t=e.target,d=t.dataset; if(t.id==='phin'){ const f=t.files&&t.files[0]; if(f)photoStart(f); t.value=''; return } if(PH&&t.id==='phm'){ PH.meal=t.value; return } if(V&&V.dish&&(d.xon!=null||t.id==='xm'||t.id==='xmeal'||t.id==='xrec')){ const D=V.dish; if(d.xon!=null){D.ings[+d.xon].on=t.checked; if(D.auto)D.name=DICT.dishName(D.ings)} if(t.id==='xm')D.meth=t.value; if(t.id==='xmeal')D.meal=t.value; if(t.id==='xrec'){D.rec=t.checked;return} renderDish(); return } if(t.id==='rm'&&RE){ syncRecipe(); openRecipe(); return } if(d.dg!=null||d.dmeal!=null){ dictEdit(t); return } if(tab==='menu'&&menuChange(t))return; if(d.imeal!=null){V.items[+d.imeal].meal=t.value;return}
   if(t.id==='imp'&&t.files[0]){ t.files[0].text().then(x=>{ const j=JSON.parse(x); if(!j.days)throw 0; if(!confirm('Заменить текущие данные импортом?'))return; S=Object.assign(def(),j); save(); dirty(); render(); toast('Импортировано') }).catch(()=>toast('Неверный файл')) } });
 document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&e.target.id==='pq'){e.preventDefault();showRes()} });
 $('#ver').textContent='v'+VER; render();
